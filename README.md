@@ -24,6 +24,20 @@ python3 -m http.server 8000
 
 Or simply open `index.html` in a modern browser.
 
+## Hosting / deployment
+
+This repo is **private**. GitHub Pages does **not** host private repos on the
+free plan, so the included Pages workflow (`.github/workflows/pages.yml`) is
+manual-only for now. To publish a live version, pick one:
+
+- **Vercel / Netlify (free, keeps repo private):** link your GitHub account, import
+  `collider-quest`, deploy with default settings (it's a static site — no build
+  command, output = repo root). Auto-deploys on every push.
+- **Make the repo public:** then enable **Settings → Pages → Source: GitHub
+  Actions** and re-add the `push` trigger in `pages.yml`. Deploys to
+  `https://sayan-dhani.github.io/collider-quest`.
+- **GitHub Pro (~$4/mo):** enables Pages on private repos; same steps as above.
+
 ### How to play
 1. On the LHC map, press **Start proton–proton run**.
 2. An event appears in the CMS cross-section. **Click** each track or cluster to
