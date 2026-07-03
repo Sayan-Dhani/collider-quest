@@ -1,15 +1,8 @@
 name: Deploy to GitHub Pages
 
-# NOTE: GitHub Pages requires a paid plan for PRIVATE repositories. While this
-# repo is private on the free plan, this workflow is manual-only (workflow_dispatch)
-# so it does not fail on every push. To enable automatic deploys, either make the
-# repo public or upgrade to GitHub Pro, enable Pages (Settings > Pages > Source:
-# GitHub Actions), then re-add the `push` trigger below:
-#
-#   push:
-#     branches: [main]
-#
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
