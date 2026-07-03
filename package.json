@@ -1,0 +1,13 @@
+{
+  "name": "collider-quest",
+  "version": "0.1.0",
+  "description": "Collider Quest: Find the Z Boson — an educational particle-physics browser game (CMS event hunter).",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "test": "node test/test-logic.mjs"
+  },
+  "keywords": ["physics", "education", "game", "LHC", "CMS", "outreach"],
+  "license": "MIT"
+}

@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Collider Quest — Find the Z Boson</title>
+  <meta name="description" content="Operate a simplified LHC, decode CMS detector traces, and reconstruct the Z boson." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">◎</span>
+      <span>Collider Quest</span>
+    </div>
+    <div class="tagline">Collide particles. Decode the traces. Discover the invisible.</div>
+  </header>
+
+  <main>
+    <!-- ================= HOME / LHC RING ================= -->
+    <section id="screen-home" class="screen active">
+      <div class="home-grid">
+        <div class="ring-wrap">
+          <canvas id="lhc-canvas" aria-label="LHC ring map"></canvas>
+        </div>
+        <div class="panel control-panel">
+          <h1 id="mission-title">Mission</h1>
+          <p id="mission-intro" class="intro"></p>
+          <div class="readout">
+            <div class="readout-row"><span>Beam energy</span><b>6.8 TeV</b></div>
+            <div class="readout-row"><span>Collision</span><b>proton–proton</b></div>
+            <div class="readout-row"><span>Detector</span><b>CMS</b></div>
+            <div class="readout-row"><span>Luminosity</span><b>Medium</b></div>
+          </div>
+          <p class="goal"><span class="goal-tag">Goal</span> <span id="mission-goal"></span></p>
+          <button id="start-run" class="btn btn-primary btn-big">▶ Start proton–proton run</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= DETECTOR / PLAY ================= -->
+    <section id="screen-detector" class="screen">
+      <div class="hud">
+        <button id="back-home" class="btn btn-ghost">← Map</button>
+        <span id="hud-event" class="hud-item">Event</span>
+        <span id="hud-score" class="hud-item">Score 0</span>
+        <span id="hud-z" class="hud-item">Z peak: 0</span>
+      </div>
+
+      <div class="play-grid">
+        <div class="panel detector-panel">
+          <h2 class="panel-title">CMS event display</h2>
+          <canvas id="detector-canvas" aria-label="CMS detector event display"></canvas>
+          <div class="legend">
+            <span><i class="sw" style="background:#4da6ff"></i>muon track</span>
+            <span><i class="sw" style="background:#ff8a3d"></i>jet</span>
+            <span><i class="sw" style="background:#8a94a6"></i>fake track</span>
+            <span><i class="sw sw-dash"></i>missing pT</span>
+          </div>
+        </div>
+
+        <div class="side">
+          <div id="inspector" class="panel inspector-panel"></div>
+          <div class="panel">
+            <div id="classify-bar" class="classify-bar"></div>
+            <div id="feedback" class="feedback-area"></div>
+            <button id="next-btn" class="btn btn-primary" hidden>Next event →</button>
+          </div>
+          <div class="panel">
+            <h3 class="panel-title">Dimuon mass spectrum</h3>
+            <canvas id="histogram-canvas" aria-label="Invariant mass histogram"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= SUMMARY ================= -->
+    <section id="screen-summary" class="screen">
+      <div class="summary-wrap">
+        <div class="panel">
+          <h1>Run Summary</h1>
+          <div id="summary-stats" class="summary-stats"></div>
+        </div>
+        <div class="panel">
+          <h2 class="panel-title">Your Z mass spectrum</h2>
+          <canvas id="summary-histogram" aria-label="Final invariant mass histogram"></canvas>
+          <p id="summary-closing" class="closing"></p>
+          <button id="play-again" class="btn btn-primary btn-big">Run again</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
