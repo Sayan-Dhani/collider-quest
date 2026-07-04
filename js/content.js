@@ -1,109 +1,66 @@
 // content.js
-// All player-facing text: mission framing, educational messages, and feedback.
-// Kept separate so wording can be tuned without touching game logic.
+// Player-facing text and the object-identity vocabulary. Mission-specific story
+// lives in missions.js; this holds the cross-cutting strings.
 
-export const MISSION = {
-  title: 'Mission: The Muon Trail',
-  intro:
-    'The beams are stable and CMS is ready. Some particles pass through almost ' +
-    'everything the detector is made of. Find the muons, and use them to ' +
-    'reconstruct the Z boson — a particle that decays far too quickly to see directly.',
-  goal: 'Build a clean Z peak in the dimuon mass spectrum.',
+export const TAGLINE = 'Collide particles. Decode the traces. Discover the invisible.';
+
+export const HOME_INTRO =
+  'You are a new scientist at the Large Hadron Collider. Accelerate particles, ' +
+  'collide them, and read the traces they leave in the CMS detector. Nothing is ' +
+  'seen directly — every particle is reconstructed from tracks, energy deposits ' +
+  'and missing momentum. Then comes the real work: applying selection criteria ' +
+  'to pull a signal out of overwhelming background.';
+
+// Identity choices in the Event Explorer. truthLabels the generator assigns must
+// be a subset of these.
+export const IDENTITIES = ['Muon', 'Electron', 'Photon', 'Jet', 'b-jet', 'Tau', 'Pileup'];
+
+// Per-kind hint shown while inspecting.
+export const KIND_HINT = {
+  muon: 'Track through every layer, reaching the outer muon chambers.',
+  electron: 'Track that stops in the ECAL, depositing its energy there.',
+  photon: 'ECAL energy deposit with no matching track (neutral).',
+  jet: 'A spray of many tracks with broad calorimeter energy.',
+  bjet: 'A jet with a displaced secondary vertex — a long-lived b-hadron.',
+  tau: 'A narrow jet with 1 or 3 tracks.',
+  pileupTrack: 'A soft, low-pT track from a pileup collision — not the physics of interest.',
 };
-
-export const HELP = {
-  muon: 'A muon leaves a track in the inner detector and reaches the outer muon chambers.',
-  jet: 'A jet is a spray of many particles — many tracks plus broad calorimeter energy.',
-  fake: 'A track that stops before the muon chambers is not a clean muon — treat it as unknown.',
-  met: 'Missing transverse momentum is inferred from an imbalance — it hints at an escaping neutrino.',
-};
-
-// Classification button definitions (label + value used for scoring).
-export const CLASSES = [
-  { value: 'Z_mumu', label: 'Z → μμ' },
-  { value: 'W_munu', label: 'W → μν' },
-  { value: 'QCD', label: 'QCD background' },
-];
-
-// Identity choices offered when a candidate object is selected.
-export const IDENTITIES = ['Muon', 'Electron', 'Photon', 'Jet', 'Unknown'];
-
-// Feedback after submitting a classification. Chosen by (correct?, event type).
-export function classifyFeedback(correct, event, chosenClass) {
-  if (correct) {
-    switch (event.correctClass) {
-      case 'Z_mumu':
-        return {
-          tone: 'good',
-          text:
-            'Excellent. Two opposite-charge muons form a clean Z boson candidate. ' +
-            'The event has been added to your mass histogram.',
-        };
-      case 'W_munu':
-        return {
-          tone: 'good',
-          text:
-            'Correct. One muon plus large missing energy is the classic W → μν ' +
-            'signature — the neutrino escaped the detector.',
-        };
-      case 'QCD':
-        return {
-          tone: 'good',
-          text:
-            'Correct. Many jets and no clean isolated muon pair — this is QCD ' +
-            'background, not a resonance.',
-        };
-    }
-  }
-  // Incorrect — teach why.
-  switch (event.correctClass) {
-    case 'Z_mumu':
-      return {
-        tone: 'bad',
-        text:
-          'Not quite. This event has two clean, opposite-charge muons pointing ' +
-          'back to the vertex — a strong Z → μμ candidate.',
-      };
-    case 'W_munu':
-      return {
-        tone: 'bad',
-        text:
-          'Careful. There is only one muon and large missing energy here, which ' +
-          'points to W → μν rather than a dimuon resonance.',
-      };
-    case 'QCD':
-      return {
-        tone: 'bad',
-        text:
-          'Careful. This messy multijet event has no clean isolated muon pair. ' +
-          'A good signature is not enough — this is QCD background.',
-      };
-    default:
-      return { tone: 'bad', text: 'Not quite — look again at the detector signatures.' };
-  }
-}
 
 export function idFeedback(correct, truthLabel) {
   if (correct) return { tone: 'good', text: `Correct — that object is a ${truthLabel.toLowerCase()}.` };
+  const why = {
+    Muon: 'It reaches the muon chambers — a muon.',
+    Electron: 'Track that stops in the ECAL — an electron.',
+    Photon: 'ECAL deposit with no track — a photon.',
+    Jet: 'Broad spray of tracks and calorimeter energy — a jet.',
+    'b-jet': 'A jet with a displaced vertex — a b-jet.',
+    Tau: 'A narrow 1- or 3-track jet — a tau.',
+    Pileup: 'A soft low-pT track from pileup — not signal.',
+  };
+  return { tone: 'bad', text: why[truthLabel] || 'Look again at the detector signals.' };
+}
+
+// Feedback after the "which process?" guess in the Explorer.
+export function processFeedback(correct, chosenLabel, truthLabel) {
+  if (correct) {
+    return { tone: 'good', text: `Correct — this event is ${truthLabel}. You are reading the signatures well.` };
+  }
   return {
     tone: 'bad',
-    text:
-      truthLabel === 'Muon'
-        ? 'That track reaches the muon chambers — it is a muon.'
-        : truthLabel === 'Jet'
-        ? 'That is a broad spray of tracks and calorimeter energy — a jet.'
-        : 'That track stops before the muon chambers — treat it as unknown.',
+    text: `Not quite — this is actually ${truthLabel}. In a real event a good signature is not enough; ` +
+          `that is why the Analysis Lab uses cuts across many events.`,
   };
 }
 
-// Qualitative analysis-quality label from the fraction of correct Z selections.
-export function analysisQuality(purity) {
-  if (purity >= 0.85) return 'Excellent';
-  if (purity >= 0.7) return 'Good';
-  if (purity >= 0.5) return 'Fair';
-  return 'Noisy';
+// Discovery-screen headline by significance vs. target.
+export function resultHeadline(sig, target) {
+  if (sig >= 5) return 'Discovery!';
+  if (sig >= target) return 'Target reached!';
+  if (sig >= 3) return 'Evidence — but not yet a discovery';
+  return 'Not there yet';
 }
 
 export const CLOSING =
-  'You did not see the Z boson directly. You reconstructed it from the traces of ' +
-  'its decay products. This is the essence of collider physics.';
+  'You did not see these particles directly. You reconstructed them from traces, ' +
+  'then separated a whisper of signal from a roar of background. That is ' +
+  'experimental particle physics.';

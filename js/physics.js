@@ -4,6 +4,9 @@
 
 // Fundamental-ish constants used by the game (GeV).
 export const Z_MASS = 91.2;      // Z boson mass
+export const W_MASS = 80.4;      // W boson mass
+export const HIGGS_MASS = 125.0; // Higgs boson mass
+export const TOP_MASS = 172.5;   // top quark mass
 export const MUON_MASS = 0.1057; // muon mass (~0.106 GeV, negligible vs Z)
 
 // Convert a game "angle" in degrees (0 = +x axis, counter-clockwise) to radians.
@@ -42,6 +45,33 @@ export function dimuonMass(objA, objB) {
   const qa = fourMomentum(objA.momentum, objA.angle, MUON_MASS);
   const qb = fourMomentum(objB.momentum, objB.angle, MUON_MASS);
   return invariantMass([qa, qb]);
+}
+
+// Invariant mass of two objects (each has {pt, angle}), treated with the given
+// rest mass. Used for dimuon (mass=MUON_MASS) and diphoton (mass=0) spectra.
+export function pairMass(objA, objB, mass = 0) {
+  const qa = fourMomentum(objA.pt ?? objA.momentum, objA.angle, mass);
+  const qb = fourMomentum(objB.pt ?? objB.momentum, objB.angle, mass);
+  return invariantMass([qa, qb]);
+}
+
+// Gaussian sample (Box-Muller) centered on `mean` with std `sigma`.
+export function gauss(mean, sigma) {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  const n = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  return mean + sigma * n;
+}
+
+// Asimov discovery significance for S signal over B background events. This is
+// the standard sqrt(2((S+B)ln(1+S/B) - S)), which behaves well for small B
+// (unlike naive S/sqrt(B), which blows up). Returns significance in "sigma".
+export function significance(S, B) {
+  if (S <= 0) return 0;
+  if (B <= 0.001) B = 0.001;
+  const z2 = 2 * ((S + B) * Math.log(1 + S / B) - S);
+  return Math.sqrt(Math.max(0, z2));
 }
 
 // Uniform random float in [min, max).

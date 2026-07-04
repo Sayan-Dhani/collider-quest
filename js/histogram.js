@@ -1,22 +1,11 @@
 // histogram.js
-// Live dimuon invariant-mass histogram drawn on a canvas. Updates after each
-// accepted Z candidate; a peak near the Z mass (91.2 GeV) emerges over a run.
+// Stacked signal + background histogram of a mission's observable. As the player
+// tightens cuts, the grey background shrinks and the blue signal peak emerges.
 
-import { Z_MASS } from './physics.js';
+const PAD = { left: 46, right: 12, top: 16, bottom: 34 };
 
-const X_MIN = 60;   // GeV
-const X_MAX = 120;  // GeV
-const N_BINS = 30;
-const BIN_W = (X_MAX - X_MIN) / N_BINS;
-
-const PAD = { left: 40, right: 12, top: 14, bottom: 30 };
-
-function binIndex(mass) {
-  if (mass < X_MIN || mass >= X_MAX) return -1;
-  return Math.floor((mass - X_MIN) / BIN_W);
-}
-
-export function render(canvas, values) {
+// data = { sig:[], bkg:[], xmin, xmax, bins }; observable = { name, unit, target }
+export function renderStacked(canvas, data, observable) {
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0, 0, W, H);
@@ -24,65 +13,80 @@ export function render(canvas, values) {
   const plotW = W - PAD.left - PAD.right;
   const plotH = H - PAD.top - PAD.bottom;
   const x0 = PAD.left, y0 = H - PAD.bottom;
+  const { sig, bkg, xmin, xmax, bins } = data;
 
-  // Bin the data.
-  const bins = new Array(N_BINS).fill(0);
-  for (const v of values) {
-    const b = binIndex(v);
-    if (b >= 0) bins[b]++;
-  }
-  const maxCount = Math.max(1, ...bins);
+  let maxY = 0;
+  for (let i = 0; i < bins; i++) maxY = Math.max(maxY, sig[i] + bkg[i]);
+  maxY = Math.max(1, maxY * 1.15);
 
   // Axes.
   ctx.strokeStyle = '#3a4c60';
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(x0, PAD.top);
-  ctx.lineTo(x0, y0);
-  ctx.lineTo(W - PAD.right, y0);
+  ctx.moveTo(x0, PAD.top); ctx.lineTo(x0, y0); ctx.lineTo(W - PAD.right, y0);
   ctx.stroke();
 
-  // Z-mass reference line.
-  const zx = x0 + ((Z_MASS - X_MIN) / (X_MAX - X_MIN)) * plotW;
-  ctx.strokeStyle = 'rgba(0,255,198,0.45)';
-  ctx.setLineDash([4, 4]);
-  ctx.beginPath();
-  ctx.moveTo(zx, PAD.top);
-  ctx.lineTo(zx, y0);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = 'rgba(0,255,198,0.8)';
-  ctx.font = '10px system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('Z', zx, PAD.top + 9);
-
-  // Bars.
-  const bw = plotW / N_BINS;
-  for (let i = 0; i < N_BINS; i++) {
-    if (bins[i] === 0) continue;
-    const h = (bins[i] / maxCount) * plotH;
-    const bx = x0 + i * bw;
-    const grd = ctx.createLinearGradient(0, y0 - h, 0, y0);
-    grd.addColorStop(0, '#4da6ff');
-    grd.addColorStop(1, '#2b6fb0');
-    ctx.fillStyle = grd;
-    ctx.fillRect(bx + 1, y0 - h, bw - 2, h);
-  }
-
-  // X axis ticks/labels.
+  // Y gridlines + labels.
   ctx.fillStyle = '#8aa0b8';
   ctx.font = '10px system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  for (let m = X_MIN; m <= X_MAX; m += 15) {
-    const tx = x0 + ((m - X_MIN) / (X_MAX - X_MIN)) * plotW;
-    ctx.fillText(String(m), tx, y0 + 14);
+  ctx.textAlign = 'right';
+  for (let g = 0; g <= 4; g++) {
+    const yy = y0 - (g / 4) * plotH;
+    const val = Math.round((g / 4) * maxY);
+    ctx.fillStyle = '#2a3a4d';
+    ctx.beginPath(); ctx.moveTo(x0, yy); ctx.lineTo(W - PAD.right, yy); ctx.stroke();
+    ctx.fillStyle = '#8aa0b8';
+    ctx.fillText(String(val), x0 - 5, yy + 3);
   }
-  ctx.fillText('Dimuon mass [GeV]', x0 + plotW / 2, H - 4);
 
-  // Y label (count).
-  ctx.save();
-  ctx.translate(11, PAD.top + plotH / 2);
-  ctx.rotate(-Math.PI / 2);
-  ctx.fillText('Events', 0, 0);
-  ctx.restore();
+  // Target line (e.g. the resonance mass).
+  if (observable.target != null) {
+    const tx = x0 + ((observable.target - xmin) / (xmax - xmin)) * plotW;
+    ctx.strokeStyle = 'rgba(0,255,198,0.5)';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath(); ctx.moveTo(tx, PAD.top); ctx.lineTo(tx, y0); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(0,255,198,0.85)';
+    ctx.textAlign = 'center';
+    ctx.fillText(`${observable.target}`, tx, PAD.top + 9);
+  }
+
+  // Bars: background (grey) then signal stacked on top (blue).
+  const bw = plotW / bins;
+  for (let i = 0; i < bins; i++) {
+    const bx = x0 + i * bw;
+    const bH = (bkg[i] / maxY) * plotH;
+    const sH = (sig[i] / maxY) * plotH;
+    if (bH > 0) {
+      ctx.fillStyle = 'rgba(120,140,165,0.55)';
+      ctx.fillRect(bx + 0.5, y0 - bH, bw - 1, bH);
+    }
+    if (sH > 0) {
+      const grd = ctx.createLinearGradient(0, y0 - bH - sH, 0, y0 - bH);
+      grd.addColorStop(0, '#4da6ff');
+      grd.addColorStop(1, '#2b6fb0');
+      ctx.fillStyle = grd;
+      ctx.fillRect(bx + 0.5, y0 - bH - sH, bw - 1, sH);
+    }
+  }
+
+  // X labels.
+  ctx.fillStyle = '#8aa0b8';
+  ctx.textAlign = 'center';
+  const steps = 5;
+  for (let s = 0; s <= steps; s++) {
+    const val = xmin + (s / steps) * (xmax - xmin);
+    const tx = x0 + (s / steps) * plotW;
+    ctx.fillText(val % 1 === 0 ? String(val) : val.toFixed(0), tx, y0 + 14);
+  }
+  ctx.fillText(`${observable.name}${observable.unit ? ' [' + observable.unit + ']' : ''}`,
+    x0 + plotW / 2, H - 4);
+
+  // Legend.
+  ctx.textAlign = 'left';
+  const lx = x0 + 8, ly = PAD.top + 8;
+  ctx.fillStyle = '#4da6ff'; ctx.fillRect(lx, ly - 8, 10, 10);
+  ctx.fillStyle = '#cfe0f0'; ctx.fillText('signal', lx + 14, ly);
+  ctx.fillStyle = 'rgba(120,140,165,0.8)'; ctx.fillRect(lx + 64, ly - 8, 10, 10);
+  ctx.fillStyle = '#cfe0f0'; ctx.fillText('background', lx + 78, ly);
 }

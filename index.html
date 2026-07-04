@@ -3,89 +3,149 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Collider Quest — Find the Z Boson</title>
-  <meta name="description" content="Operate a simplified LHC, decode CMS detector traces, and reconstruct the Z boson." />
+  <title>Collider Quest — From Beams to Discovery</title>
+  <meta name="description" content="Operate the LHC, decode CMS detector traces, and cut signal from background to make a discovery." />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">
-      <span class="logo">◎</span>
-      <span>Collider Quest</span>
-    </div>
-    <div class="tagline">Collide particles. Decode the traces. Discover the invisible.</div>
+    <div class="brand"><span class="logo">◎</span><span>Collider Quest</span></div>
+    <div class="tagline" id="tagline"></div>
   </header>
 
   <main>
-    <!-- ================= HOME / LHC RING ================= -->
+    <!-- ===================== HOME ===================== -->
     <section id="screen-home" class="screen active">
       <div class="home-grid">
-        <div class="ring-wrap">
-          <canvas id="lhc-canvas" aria-label="LHC ring map"></canvas>
-        </div>
+        <div class="ring-wrap"><canvas id="lhc-canvas" aria-label="LHC ring map"></canvas></div>
         <div class="panel control-panel">
-          <h1 id="mission-title">Mission</h1>
-          <p id="mission-intro" class="intro"></p>
+          <h1>Welcome to the control room</h1>
+          <p class="intro" id="home-intro"></p>
           <div class="readout">
             <div class="readout-row"><span>Beam energy</span><b>6.8 TeV</b></div>
             <div class="readout-row"><span>Collision</span><b>proton–proton</b></div>
             <div class="readout-row"><span>Detector</span><b>CMS</b></div>
-            <div class="readout-row"><span>Luminosity</span><b>Medium</b></div>
           </div>
-          <p class="goal"><span class="goal-tag">Goal</span> <span id="mission-goal"></span></p>
-          <button id="start-run" class="btn btn-primary btn-big">▶ Start proton–proton run</button>
+          <button id="enter-btn" class="btn btn-primary btn-big">▶ Enter the campaign</button>
         </div>
       </div>
     </section>
 
-    <!-- ================= DETECTOR / PLAY ================= -->
-    <section id="screen-detector" class="screen">
-      <div class="hud">
-        <button id="back-home" class="btn btn-ghost">← Map</button>
-        <span id="hud-event" class="hud-item">Event</span>
-        <span id="hud-score" class="hud-item">Score 0</span>
-        <span id="hud-z" class="hud-item">Z peak: 0</span>
+    <!-- ===================== MISSION SELECT ===================== -->
+    <section id="screen-missions" class="screen">
+      <div class="section-head">
+        <button class="btn btn-ghost" data-nav="home">← Home</button>
+        <h1>Campaign</h1>
+        <span class="muted" id="progress-note"></span>
       </div>
+      <div id="mission-grid" class="mission-grid"></div>
+    </section>
 
+    <!-- ===================== BRIEFING ===================== -->
+    <section id="screen-briefing" class="screen">
+      <div class="section-head">
+        <button class="btn btn-ghost" data-nav="missions">← Campaign</button>
+        <h1 id="brief-title">Mission</h1>
+        <span class="chip" id="brief-difficulty"></span>
+      </div>
+      <div class="brief-grid">
+        <div class="panel">
+          <div class="brief-tag"><span id="brief-chapter"></span> · <b id="brief-tagline"></b></div>
+          <p class="story" id="brief-story"></p>
+          <div class="lesson-box"><span class="lesson-tag">Physics</span><span id="brief-lesson"></span></div>
+          <p class="goal"><span class="goal-tag">Objective</span> <span id="brief-objective"></span></p>
+        </div>
+        <div class="panel">
+          <h3 class="panel-title">You will meet these events</h3>
+          <ul id="brief-explore" class="explore-list"></ul>
+          <div class="brief-actions">
+            <button id="btn-explorer" class="btn btn-primary">Open Event Explorer →</button>
+            <button id="btn-skip-lab" class="btn">Skip to Analysis Lab</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== EVENT EXPLORER ===================== -->
+    <section id="screen-explorer" class="screen">
+      <div class="hud">
+        <button class="btn btn-ghost" data-nav="briefing">← Briefing</button>
+        <span id="exp-title" class="hud-item"></span>
+        <span id="exp-count" class="hud-item"></span>
+        <button id="exp-to-lab" class="btn btn-primary hud-right">Go to Analysis Lab →</button>
+      </div>
       <div class="play-grid">
         <div class="panel detector-panel">
-          <h2 class="panel-title">CMS event display</h2>
+          <h2 class="panel-title">CMS event display — many processes at once</h2>
           <canvas id="detector-canvas" aria-label="CMS detector event display"></canvas>
           <div class="legend">
-            <span><i class="sw" style="background:#4da6ff"></i>muon track</span>
+            <span><i class="sw" style="background:#4da6ff"></i>muon</span>
+            <span><i class="sw" style="background:#5be08a"></i>electron</span>
+            <span><i class="sw" style="background:#ffe14d"></i>photon</span>
             <span><i class="sw" style="background:#ff8a3d"></i>jet</span>
-            <span><i class="sw" style="background:#8a94a6"></i>fake track</span>
+            <span><i class="sw" style="background:#c98bff"></i>b-jet</span>
+            <span><i class="sw" style="background:#ff5db1"></i>tau</span>
+            <span><i class="sw" style="background:#54637a"></i>pileup</span>
             <span><i class="sw sw-dash"></i>missing pT</span>
           </div>
         </div>
-
         <div class="side">
           <div id="inspector" class="panel inspector-panel"></div>
           <div class="panel">
-            <div id="classify-bar" class="classify-bar"></div>
-            <div id="feedback" class="feedback-area"></div>
-            <button id="next-btn" class="btn btn-primary" hidden>Next event →</button>
-          </div>
-          <div class="panel">
-            <h3 class="panel-title">Dimuon mass spectrum</h3>
-            <canvas id="histogram-canvas" aria-label="Invariant mass histogram"></canvas>
+            <div class="classify-label">Which process is this event?</div>
+            <div id="exp-process" class="classify-bar"></div>
+            <div id="exp-feedback" class="feedback-area"></div>
+            <button id="exp-next" class="btn btn-primary" hidden>Next event →</button>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ================= SUMMARY ================= -->
-    <section id="screen-summary" class="screen">
-      <div class="summary-wrap">
+    <!-- ===================== ANALYSIS LAB ===================== -->
+    <section id="screen-lab" class="screen">
+      <div class="hud">
+        <button class="btn btn-ghost" data-nav="briefing">← Briefing</button>
+        <span id="lab-title" class="hud-item"></span>
+        <button id="btn-claim" class="btn btn-primary hud-right" disabled>Claim discovery</button>
+      </div>
+      <div class="lab-grid">
+        <div class="panel cuts-wrap">
+          <h3 class="panel-title">Selection cuts</h3>
+          <p class="muted small">Enable criteria and drag the thresholds. Watch signal rise and background fall.</p>
+          <div id="cuts-panel"></div>
+        </div>
+        <div class="lab-center">
+          <div class="panel">
+            <div id="metrics"></div>
+          </div>
+          <div class="panel">
+            <canvas id="lab-canvas" aria-label="Stacked signal and background histogram"></canvas>
+            <div class="lumi-row">
+              <label>Integrated luminosity</label>
+              <input id="lumi-range" type="range" min="1" max="4" step="0.5" value="1" />
+              <b id="lumi-val">×1.0</b>
+              <span class="muted small">more data → more events → higher significance</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== RESULT ===================== -->
+    <section id="screen-result" class="screen">
+      <div class="result-wrap">
         <div class="panel">
-          <h1>Run Summary</h1>
-          <div id="summary-stats" class="summary-stats"></div>
+          <h1 id="result-headline">Result</h1>
+          <div id="result-stats" class="summary-stats"></div>
+          <p id="result-closing" class="closing"></p>
+          <div class="brief-actions">
+            <button id="result-next" class="btn btn-primary" hidden>Next mission →</button>
+            <button class="btn" data-nav="missions">Back to campaign</button>
+          </div>
         </div>
         <div class="panel">
-          <h2 class="panel-title">Your Z mass spectrum</h2>
-          <canvas id="summary-histogram" aria-label="Final invariant mass histogram"></canvas>
-          <p id="summary-closing" class="closing"></p>
-          <button id="play-again" class="btn btn-primary btn-big">Run again</button>
+          <h2 class="panel-title">Your selected spectrum</h2>
+          <canvas id="result-canvas" aria-label="Final histogram"></canvas>
         </div>
       </div>
     </section>

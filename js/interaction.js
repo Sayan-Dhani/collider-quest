@@ -3,7 +3,7 @@
 // panel where the player reads detector signals and assigns an identity.
 
 import { hitTest } from './detector.js';
-import { IDENTITIES } from './content.js';
+import { IDENTITIES, KIND_HINT } from './content.js';
 
 // Translate a mouse event to canvas pixel coordinates, accounting for any CSS
 // scaling of the canvas element.
@@ -42,12 +42,17 @@ export function attachCanvas(canvas, handlers) {
 // Beginner-friendly detector readout for an object (design doc §8).
 function readout(object) {
   const lvl = (e) => (e < 3 ? 'low' : e < 10 ? 'medium' : 'high');
+  const hasTrack = object.kind !== 'photon';
+  const many = object.kind === 'jet' || object.kind === 'bjet' || object.kind === 'tau';
   const rows = [
-    ['Track', object.kind === 'jet' ? 'many (spray)' : 'yes'],
+    ['Track', many ? `${object.nprong || 'many'} (spray)` : hasTrack ? 'yes' : 'none'],
+    ['pT', `${Math.round(object.pt)} GeV`],
     ['Reaches muon system', object.reachesMuonSystem ? 'yes' : 'no'],
     ['ECAL energy', lvl(object.ecal)],
     ['HCAL energy', lvl(object.hcal)],
+    ['Isolation', object.iso < 0.15 ? 'isolated' : 'in activity'],
   ];
+  if (object.displaced) rows.push(['Secondary vertex', 'displaced']);
   if (object.charge) rows.push(['Charge', object.charge]);
   return rows;
 }

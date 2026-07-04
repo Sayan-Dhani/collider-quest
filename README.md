@@ -33,60 +33,73 @@ The site is a static build deployed by GitHub Actions
 on a fork: enable **Settings → Pages → Source: GitHub Actions**, then push.
 
 ### How to play
-1. On the LHC map, press **Start proton–proton run**.
-2. An event appears in the CMS cross-section. **Click** each track or cluster to
-   inspect its detector signals and assign an identity (Muon / Jet / …).
-   - A track that reaches the **muon chambers** is a muon.
-   - A broad spray of tracks + calorimeter energy is a **jet**.
-   - A track that stops early is a low-quality **fake** — treat it as unknown.
-3. **Classify** the whole event: `Z → μμ`, `W → μν`, or `QCD background`.
-4. Correct **Z → μμ** events add an entry to the dimuon mass histogram. After
-   ~20 events, a peak forms near **91 GeV** — the Z boson.
+1. From the home screen, **enter the campaign** and pick a mission.
+2. Read the **briefing** (story + the physics you're about to do).
+3. **Event Explorer** — real events are messy: several processes plus pileup
+   overlap in one display. Click objects to inspect their detector signals
+   (track? reaches the muon chambers? isolated? displaced vertex?), identify
+   them, and guess which process produced the event.
+4. **Analysis Lab** — the heart of the game. You get a whole dataset (a little
+   signal buried in a lot of background). Enable **selection cuts** and drag
+   their thresholds — require two muons, opposite charge, isolation, a b-jet
+   veto, a mass window, missing energy, b-tags… Watch, live:
+   - the **stacked histogram** (blue signal rising over grey background),
+   - **signal kept / background kept / purity**, and
+   - the **significance** climbing toward the discovery target.
+   Raise the **integrated luminosity** for more data (∝ √luminosity). When you
+   reach the target significance, **claim the discovery** and unlock the next
+   mission.
+
+### Missions
+Z → μμ · W → μν · H → γγ · tt̄ (b-tagging) · HH → bbττ · (heavy-ion: coming soon)
 
 ## How it works
 
 Pure vanilla HTML/CSS/JS with the HTML Canvas — no frameworks, no bundler.
 
 ```
-index.html              screens (LHC map, detector, summary)
+index.html              screens: home, campaign, briefing, explorer, lab, result
 styles.css              dark "control room" theme
 js/
-  physics.js            invariant mass, 4-momenta, RNG helpers
-  events.js             data-driven event templates + generator (Z / W / QCD)
-  detector.js           CMS cross-section rendering + click hit-testing
-  interaction.js        canvas mouse handling + object inspector panel
-  classify.js           event classification bar + feedback
-  histogram.js          live dimuon invariant-mass histogram
-  state.js              run state + scoring rules
-  content.js            mission text, educational messages, feedback
-  main.js               screen router + game loop
+  physics.js            invariant mass, 4-momenta, Asimov significance, RNG
+  events.js             object types, processes, pileup, features, datasets
+  missions.js           campaign config: stories, observables, processes, cuts
+  detector.js           CMS rendering (all object types + pileup) + hit-testing
+  interaction.js        canvas mouse handling + object inspector
+  analysis.js           cuts, significance, stacked histogram binning, cut UI
+  histogram.js          stacked signal+background histogram
+  content.js            identities, hints, feedback, closing text
+  main.js               campaign flow + screen router
 test/
-  test-logic.mjs        node sanity checks for the DOM-free logic
+  test-v2.mjs           node tests: features, weighting, cuts, winnability
 ```
 
-The event generator is a **registry of templates** (`js/events.js`). Adding a
-new chapter (Higgs → γγ, top quark, HH → bbττ, heavy-ion) means adding an entry
-to that registry and its object renderers — the game loop, scoring, and
-histogram stay the same.
+Everything is **data-driven from `missions.js`**. A mission declares its signal
+and background processes (with expected yields), which observable to plot, and
+which cuts the player can apply. The Explorer and Analysis Lab are generic — a
+new scenario is a new entry, not new engine code. The physics is deliberately
+simplified (educational, not a real simulation) but the *logic* is real:
+isolation, mass windows, b-tag/MET requirements, and Asimov significance
+`√(2((S+B)ln(1+S/B) − S))`.
 
 ## Test
 
 ```bash
-npm test        # runs node test/test-logic.mjs
+npm test        # runs node test/test-v2.mjs
 ```
 
-Checks that Z events reconstruct near the Z mass, all event types generate,
-object-identity rules are consistent, and the scoring/run logic is correct.
+Checks resonances reconstruct at the right mass, dataset weighting reproduces
+expected yields, isolation/b-tag behaviour is correct, and — crucially — that
+every mission is **winnable** (a good set of cuts reaches its target
+significance) yet has a real discovery arc (low significance before cuts).
 
 ## Roadmap
 
-The MVP is deliberately small. Planned expansion (see design docs):
+Implemented: Z → μμ, W → μν, H → γγ, tt̄ (b-tagging), HH → bbττ. Next:
 
-1. **Z Boson Hunter** — this MVP ✅
-2. **Higgs → γγ** — photon ID, diphoton mass, small bump over smooth background
-3. **Top Quark Lab** — jets, b-tagging, lepton + missing energy
-4. **Higgs Pair Challenge** — HH → bbττ, signal/background optimization
-5. **Heavy-Ion Mode** — Pb–Pb collisions, jet quenching
+- **Heavy-Ion Mode** — Pb–Pb collisions, jet quenching (a different mechanic)
+- Track/calorimeter **reconstruction mini-games** (connect hits into tracks)
+- Detector **calibration** (shift the energy scale so the Z peak lands at 91)
 
 ## License
 
