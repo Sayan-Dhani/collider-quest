@@ -60,7 +60,10 @@
           <div class="panel">
             <h3 class="panel-title">Interaction point</h3>
             <div id="acc-info" class="acc-info"></div>
-            <button id="acc-enter-cms" class="btn btn-primary">Enter CMS →</button>
+            <div class="brief-actions">
+              <button id="acc-enter-cms" class="btn btn-primary">Enter CMS →</button>
+              <button id="acc-view-detector" class="btn">🔬 See the real CMS</button>
+            </div>
           </div>
         </div>
       </div>
@@ -111,7 +114,10 @@
       </div>
       <div class="play-grid">
         <div class="panel detector-panel">
-          <h2 class="panel-title">CMS event display — many processes at once</h2>
+          <div class="detector-head">
+            <h2 class="panel-title">CMS event display — many processes at once</h2>
+            <button id="exp-view-detector" class="btn btn-ghost small">🔬 Real CMS detector</button>
+          </div>
           <canvas id="detector-canvas" aria-label="CMS detector event display"></canvas>
           <div class="legend">
             <span><i class="sw" style="background:#4da6ff"></i>muon</span>
@@ -185,6 +191,27 @@
       </div>
     </section>
   </main>
+
+  <!-- ===================== REAL CMS DETECTOR MODAL ===================== -->
+  <div id="detector-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-close-modal></div>
+    <div class="modal-box" role="dialog" aria-label="The real CMS detector">
+      <button class="modal-close" data-close-modal aria-label="Close">✕</button>
+      <h2>The real CMS detector</h2>
+      <img class="modal-img" src="assets/cms_detector.png"
+           alt="Cutaway diagram of the CMS detector showing tracker, calorimeters, solenoid, steel yoke and muon chambers" />
+      <p class="modal-cap">
+        The game's circular event display is a slice through this real detector,
+        looking straight down the beam pipe. From the centre outward:
+        <b>silicon tracker</b> (curved charged-particle tracks) →
+        <b>ECAL</b> crystals (electrons &amp; photons) →
+        <b>HCAL</b> (jets) → the <b>superconducting solenoid</b> (3.8 T) →
+        the <b>steel return yoke</b> threaded with <b>muon chambers</b> (muons).
+        14,000 tonnes, 15 m across — and a person for scale.
+      </p>
+      <p class="muted small">Image: CERN / CMS Collaboration.</p>
+    </div>
+  </div>
 
   <script type="module" src="js/main.js"></script>
 </body>

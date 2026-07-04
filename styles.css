@@ -264,6 +264,30 @@ main { padding: 22px; max-width: 1200px; margin: 0 auto; }
 .acc-info .acc-role { color: var(--accent); font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px; }
 #acc-canvas { cursor: pointer; }
 
+/* ---- detector panel header (with real-detector button) ---- */
+.detector-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; }
+.detector-head .panel-title { margin: 0; }
+
+/* ---- real CMS detector modal ---- */
+.modal { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.modal[hidden] { display: none; }
+.modal-backdrop { position: absolute; inset: 0; background: rgba(4, 8, 12, 0.8); backdrop-filter: blur(3px); }
+.modal-box {
+  position: relative; z-index: 1; max-width: 960px; width: 100%; max-height: 90vh; overflow: auto;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--line); border-radius: 14px; padding: 20px; box-shadow: var(--shadow);
+  animation: fade 0.25s ease;
+}
+.modal-box h2 { margin: 0 0 12px; }
+.modal-img { display: block; width: 100%; height: auto; border-radius: 10px; background: #fff; }
+.modal-cap { margin: 14px 0 6px; line-height: 1.6; color: var(--text); font-size: 14px; }
+.modal-close {
+  position: absolute; top: 12px; right: 12px; z-index: 2; cursor: pointer;
+  width: 34px; height: 34px; border-radius: 8px; font-size: 16px;
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--text);
+}
+.modal-close:hover { border-color: var(--accent); }
+
 /* ---- responsive ---- */
 @media (max-width: 950px) {
   .home-grid, .play-grid, .brief-grid, .lab-grid, .result-wrap, .acc-grid { grid-template-columns: 1fr; }

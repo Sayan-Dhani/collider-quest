@@ -323,6 +323,10 @@ function showExperimentInfo(id) {
     `<span class="acc-role">${e.name} · ${e.role}</span>${e.blurb}`;
 }
 
+// ============================ REAL DETECTOR MODAL ===========================
+function openDetectorModal() { els.detectorModal.hidden = false; }
+function closeDetectorModal() { els.detectorModal.hidden = true; }
+
 // ============================ INIT ==========================================
 function sizeCanvas(c, w, h) { c.width = w; c.height = h; }
 
@@ -349,6 +353,7 @@ function init() {
     resultClosing: $('result-closing'),
     resultCanvas: $('result-canvas'),
     resultNext: $('result-next'),
+    detectorModal: $('detector-modal'),
   };
 
   sizeCanvas(els.lhcCanvas, 420, 420);
@@ -375,6 +380,16 @@ function init() {
   els.accCanvas.addEventListener('click', onAccClick);
   $('acc-ramp').addEventListener('click', () => accelerator.startRamp(acc));
   $('acc-enter-cms').addEventListener('click', renderMissions);
+
+  // Real CMS detector image modal.
+  $('acc-view-detector').addEventListener('click', openDetectorModal);
+  $('exp-view-detector').addEventListener('click', openDetectorModal);
+  for (const el of document.querySelectorAll('[data-close-modal]')) {
+    el.addEventListener('click', closeDetectorModal);
+  }
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeDetectorModal();
+  });
 
   $('btn-explorer').addEventListener('click', openExplorer);
   $('btn-skip-lab').addEventListener('click', openLab);

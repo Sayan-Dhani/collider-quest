@@ -101,6 +101,14 @@ step('open first mission briefing', () => {
   card.click();
 });
 step('open event explorer', () => getEl('btn-explorer').click());
+step('open real-detector modal', () => {
+  getEl('exp-view-detector').click();
+  if (getEl('detector-modal').hidden !== false) throw new Error('modal did not open');
+});
+step('close modal via Escape', () => {
+  docL.keydown({ key: 'Escape' });
+  if (getEl('detector-modal').hidden !== true) throw new Error('modal did not close');
+});
 step('identify an object', () => {
   // simulate a canvas click by invoking the click handler with coords over center
   getEl('detector-canvas').dispatch('click', { clientX: 280, clientY: 280 });

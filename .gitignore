@@ -11,3 +11,7 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# Raw source art (large PDF/EPS). Only optimised web images in assets/ are
+# committed; regenerate assets/*.png from these locally (see assets/README.md).
+image/
