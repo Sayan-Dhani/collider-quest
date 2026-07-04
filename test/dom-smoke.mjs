@@ -39,8 +39,8 @@ function ctxStub() {
 const byId = new Map();
 function getEl(id) { if (!byId.has(id)) byId.set(id, mkEl()); return byId.get(id); }
 
-const screens = ['screen-home', 'screen-missions', 'screen-briefing', 'screen-explorer', 'screen-lab', 'screen-result']
-  .map((id) => { const e = mkEl('section'); e._attrs.id = id; e.id = id; return e; });
+const screens = ['screen-home', 'screen-accelerator', 'screen-missions', 'screen-briefing', 'screen-explorer', 'screen-lab', 'screen-result']
+  .map((id) => { const e = mkEl('section'); e._attrs.id = id; e.id = id; byId.set(id, e); return e; });
 
 global.requestAnimationFrame = () => 0; // no recursion
 global.localStorage = { _d: {}, getItem(k) { return this._d[k] ?? null; }, setItem(k, v) { this._d[k] = v; } };
@@ -61,9 +61,37 @@ let errors = 0;
 const step = (name, fn) => { try { fn(); console.log('  ok  ' + name); } catch (e) { console.log(' FAIL ' + name + ' :: ' + e.stack.split('\n').slice(0,3).join(' | ')); errors++; } };
 
 await import('../js/main.js');
+const { EXPERIMENTS } = await import('../js/accelerator.js');
 
 step('DOMContentLoaded init', () => docL.DOMContentLoaded());
-step('enter campaign', () => getEl('enter-btn').click());
+
+// geometry: CMS<->ATLAS and ALICE<->LHCb are diametrically opposite
+step('interaction-point geometry (opposite pairs)', () => {
+  const A = Object.fromEntries(EXPERIMENTS.map((e) => [e.id, e.angle]));
+  const opp = (a, b) => {
+    let d = (((A[a] - A[b]) % 360) + 360) % 360; // 0..360
+    if (d > 180) d = 360 - d;                    // 0..180
+    return Math.abs(d - 180) < 1;                // opposite == 180 apart
+  };
+  if (!opp('cms', 'atlas')) throw new Error(`CMS/ATLAS not opposite: ${A.cms} vs ${A.atlas}`);
+  if (!opp('alice', 'lhcb')) throw new Error(`ALICE/LHCb not opposite: ${A.alice} vs ${A.lhcb}`);
+});
+
+step('enter LHC -> accelerator', () => getEl('enter-btn').click());
+step('accelerator draws + energy readout set', () => {
+  if (!getEl('acc-energy').textContent.includes('TeV')) throw new Error('energy readout not updated');
+});
+// acc-canvas is 520x520 -> center (260,260), R=208. CMS at angle 0 => (468,260).
+step('hover/click ATLAS shows info', () => {
+  getEl('acc-canvas').dispatch('mousemove', { clientX: 52, clientY: 260 }); // ATLAS (angle 180)
+  getEl('acc-canvas').dispatch('click', { clientX: 52, clientY: 260 });
+  if (!/ATLAS/.test(getEl('acc-info').innerHTML)) throw new Error('ATLAS info not shown');
+});
+step('click CMS enters campaign', () => {
+  getEl('acc-canvas').dispatch('click', { clientX: 468, clientY: 260 }); // CMS (angle 0)
+  const grid = getEl('mission-grid');
+  if (!grid._children.some((c) => (c._handlers.click || []).length)) throw new Error('campaign not rendered');
+});
 
 // find first mission card and open briefing
 step('open first mission briefing', () => {

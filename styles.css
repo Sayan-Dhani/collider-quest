@@ -248,9 +248,25 @@ main { padding: 22px; max-width: 1200px; margin: 0 auto; }
 .result-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
 .result-wrap h1 { margin-top: 0; }
 
+/* ---- accelerator / LHC map ---- */
+.acc-grid { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(280px, 0.7fr); gap: 18px; align-items: start; }
+.acc-ring-panel { display: flex; flex-direction: column; align-items: center; }
+#acc-canvas {
+  width: 100%; max-width: 520px; height: auto; border-radius: 12px;
+  background: radial-gradient(circle at center, #0e1620, #0a0f16);
+}
+.acc-ring-panel .small { margin-top: 12px; text-align: center; max-width: 520px; }
+.energy-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.energy-row b { color: var(--accent-2); font-size: 18px; }
+.energy-bar { height: 12px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid var(--line); overflow: hidden; margin-bottom: 12px; }
+.energy-bar i { display: block; height: 100%; width: 0%; border-radius: 999px; background: linear-gradient(90deg, #2b7fd0, var(--accent-2)); transition: width 0.1s linear; }
+.acc-info { min-height: 92px; margin-bottom: 12px; line-height: 1.5; color: var(--text); font-size: 14px; }
+.acc-info .acc-role { color: var(--accent); font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px; }
+#acc-canvas { cursor: pointer; }
+
 /* ---- responsive ---- */
 @media (max-width: 950px) {
-  .home-grid, .play-grid, .brief-grid, .lab-grid, .result-wrap { grid-template-columns: 1fr; }
+  .home-grid, .play-grid, .brief-grid, .lab-grid, .result-wrap, .acc-grid { grid-template-columns: 1fr; }
   .cuts-wrap { position: static; }
   .tagline { display: none; }
   .metric-grid { grid-template-columns: repeat(2, 1fr); }

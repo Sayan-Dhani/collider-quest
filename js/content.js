@@ -4,6 +4,17 @@
 
 export const TAGLINE = 'Collide particles. Decode the traces. Discover the invisible.';
 
+export const ACCELERATOR_INTRO =
+  'Two proton beams race around the 27 km ring in opposite directions and are ' +
+  'steered into each other at four points — where the CMS, ATLAS, ALICE and LHCb ' +
+  'detectors sit. At 6.8 TeV per beam the bunches cross ~40 million times a ' +
+  'second. Click an interaction point to learn about its experiment; enter CMS ' +
+  'to reconstruct the collisions yourself.';
+
+export const ACC_INFO_DEFAULT =
+  'Hover or click an interaction point. CMS and ATLAS sit opposite each other on ' +
+  'the ring; ALICE and LHCb sit on the other axis.';
+
 export const HOME_INTRO =
   'You are a new scientist at the Large Hadron Collider. Accelerate particles, ' +
   'collide them, and read the traces they leave in the CMS detector. Nothing is ' +

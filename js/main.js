@@ -1,17 +1,19 @@
 // main.js
 // Orchestrates Collider Quest v2:
-//   Home -> Campaign -> Briefing -> Event Explorer -> Analysis Lab -> Result.
+//   Home -> Accelerator -> Campaign -> Briefing -> Explorer -> Analysis Lab -> Result.
 
 import { MISSIONS, getMission } from './missions.js';
 import { makeDisplayEvent, makeDataset } from './events.js';
 import * as detector from './detector.js';
+import * as accelerator from './accelerator.js';
 import { renderStacked } from './histogram.js';
 import { attachCanvas, renderInspector } from './interaction.js';
 import {
   initStates, computeResult, binStacked, renderCuts, renderMetrics, confidenceLabel,
 } from './analysis.js';
 import {
-  TAGLINE, HOME_INTRO, idFeedback, processFeedback, resultHeadline, CLOSING,
+  TAGLINE, HOME_INTRO, ACCELERATOR_INTRO, ACC_INFO_DEFAULT,
+  idFeedback, processFeedback, resultHeadline, CLOSING,
 } from './content.js';
 
 const $ = (id) => document.getElementById(id);
@@ -38,6 +40,8 @@ let els;
 let mission = null;
 let exp = null;   // explorer state
 let lab = null;   // lab state
+let acc = null;   // accelerator state
+let accHover = null; // hovered interaction point id
 
 // --- screens -----------------------------------------------------------------
 function show(id) {
@@ -256,39 +260,67 @@ function claimDiscovery() {
   show('screen-result');
 }
 
-// ============================ HOME: LHC ring =================================
-function drawLHCRing(t) {
-  const c = els.lhcCanvas; if (!c) return;
-  const ctx = c.getContext('2d');
-  const W = c.width, H = c.height, cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 46;
-  ctx.clearRect(0, 0, W, H);
-  ctx.strokeStyle = '#2c3e52'; ctx.lineWidth = 10;
-  ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.stroke();
-  for (let i = 0; i < 6; i++) {
-    const a = t * 0.0016 + (i * Math.PI) / 3;
-    ctx.fillStyle = 'rgba(0,255,198,0.9)';
-    ctx.beginPath(); ctx.arc(cx + R * Math.cos(a), cy + R * Math.sin(a), 3, 0, Math.PI * 2); ctx.fill();
+// ============================ ACCELERATOR / LHC MAP =========================
+const homeTeaser = accelerator.createState();
+
+// Home shows a calm, non-interactive teaser of the same ring.
+function drawHomeTeaser() {
+  if (els.lhcCanvas) accelerator.draw(els.lhcCanvas, homeTeaser, { mode: 'teaser' });
+  requestAnimationFrame(drawHomeTeaser);
+}
+
+function openAccelerator() {
+  acc = accelerator.createState();
+  accHover = null;
+  accelerator.startRamp(acc);
+  $('acc-intro').textContent = ACCELERATOR_INTRO;
+  els.accInfo.innerHTML = ACC_INFO_DEFAULT;
+  show('screen-accelerator');
+  drawAcceleratorFrame();
+}
+
+function drawAcceleratorFrame() {
+  // Stop the loop when the accelerator screen is no longer visible.
+  if (!document.getElementById('screen-accelerator').classList.contains('active')) return;
+  accelerator.draw(els.accCanvas, acc, { hoveredId: accHover, mode: 'full' });
+  const frac = accelerator.energyFraction(acc);
+  els.accEnergy.textContent = `${acc.energy.toFixed(2)} TeV`;
+  els.accEnergyFill.style.width = `${Math.round(frac * 100)}%`;
+  els.accStatus.textContent = acc.colliding
+    ? 'Stable beams — colliding'
+    : acc.ramping ? 'Ramping beams…' : 'Injecting…';
+  requestAnimationFrame(drawAcceleratorFrame);
+}
+
+function accCoords(evt) {
+  const c = els.accCanvas, rect = c.getBoundingClientRect();
+  return { x: (evt.clientX - rect.left) * (c.width / rect.width),
+           y: (evt.clientY - rect.top) * (c.height / rect.height) };
+}
+
+function onAccMove(evt) {
+  const { x, y } = accCoords(evt);
+  const id = accelerator.hitTestIP(x, y);
+  if (id !== accHover) {
+    accHover = id;
+    els.accCanvas.style.cursor = id ? 'pointer' : 'default';
+    if (id) showExperimentInfo(id);
   }
-  const pts = [
-    { name: 'ATLAS', ang: Math.PI * 1.25, active: false },
-    { name: 'CMS', ang: Math.PI * 1.75, active: true },
-    { name: 'ALICE', ang: Math.PI * 0.75, active: false },
-    { name: 'LHCb', ang: Math.PI * 0.25, active: false },
-  ];
-  ctx.font = '13px system-ui, sans-serif'; ctx.textAlign = 'center';
-  for (const p of pts) {
-    const px = cx + R * Math.cos(p.ang), py = cy + R * Math.sin(p.ang);
-    ctx.beginPath(); ctx.arc(px, py, p.active ? 11 : 8, 0, Math.PI * 2);
-    ctx.fillStyle = p.active ? '#4da6ff' : '#3a4c60'; ctx.fill();
-    if (p.active) {
-      ctx.strokeStyle = 'rgba(77,166,255,0.5)'; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(px, py, 16, 0, Math.PI * 2); ctx.stroke();
-    }
-    ctx.fillStyle = p.active ? '#cfe6ff' : '#7f8ea0';
-    ctx.fillText(p.name + (p.active ? '' : ' 🔒'),
-      cx + (R + 26) * Math.cos(p.ang), cy + (R + 26) * Math.sin(p.ang) + 4);
-  }
-  requestAnimationFrame(drawLHCRing);
+}
+
+function onAccClick(evt) {
+  const { x, y } = accCoords(evt);
+  const id = accelerator.hitTestIP(x, y);
+  if (!id) return;
+  const e = accelerator.getExperiment(id);
+  if (e.playable) renderMissions();
+  else showExperimentInfo(id);
+}
+
+function showExperimentInfo(id) {
+  const e = accelerator.getExperiment(id);
+  els.accInfo.innerHTML =
+    `<span class="acc-role">${e.name} · ${e.role}</span>${e.blurb}`;
 }
 
 // ============================ INIT ==========================================
@@ -297,6 +329,11 @@ function sizeCanvas(c, w, h) { c.width = w; c.height = h; }
 function init() {
   els = {
     lhcCanvas: $('lhc-canvas'),
+    accCanvas: $('acc-canvas'),
+    accStatus: $('acc-status'),
+    accEnergy: $('acc-energy'),
+    accEnergyFill: $('acc-energy-fill'),
+    accInfo: $('acc-info'),
     missionGrid: $('mission-grid'),
     progressNote: $('progress-note'),
     detectorCanvas: $('detector-canvas'),
@@ -315,6 +352,7 @@ function init() {
   };
 
   sizeCanvas(els.lhcCanvas, 420, 420);
+  sizeCanvas(els.accCanvas, 520, 520);
   sizeCanvas(els.detectorCanvas, 560, 560);
   sizeCanvas(els.labCanvas, 560, 300);
   sizeCanvas(els.resultCanvas, 520, 300);
@@ -323,7 +361,7 @@ function init() {
   $('home-intro').textContent = HOME_INTRO;
 
   // Navigation.
-  $('enter-btn').addEventListener('click', renderMissions);
+  $('enter-btn').addEventListener('click', openAccelerator);
   for (const b of document.querySelectorAll('[data-nav]')) {
     b.addEventListener('click', () => {
       const t = b.getAttribute('data-nav');
@@ -332,6 +370,12 @@ function init() {
       else if (t === 'briefing') openBriefing(mission);
     });
   }
+  // Accelerator screen.
+  els.accCanvas.addEventListener('mousemove', onAccMove);
+  els.accCanvas.addEventListener('click', onAccClick);
+  $('acc-ramp').addEventListener('click', () => accelerator.startRamp(acc));
+  $('acc-enter-cms').addEventListener('click', renderMissions);
+
   $('btn-explorer').addEventListener('click', openExplorer);
   $('btn-skip-lab').addEventListener('click', openLab);
   $('exp-next').addEventListener('click', nextExplorerEvent);
@@ -341,7 +385,7 @@ function init() {
 
   attachCanvas(els.detectorCanvas, { onClickObject, onHoverObject });
 
-  requestAnimationFrame(drawLHCRing);
+  requestAnimationFrame(drawHomeTeaser);
   show('screen-home');
 }
 

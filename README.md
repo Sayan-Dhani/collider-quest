@@ -33,13 +33,18 @@ The site is a static build deployed by GitHub Actions
 on a fork: enable **Settings → Pages → Source: GitHub Actions**, then push.
 
 ### How to play
-1. From the home screen, **enter the campaign** and pick a mission.
-2. Read the **briefing** (story + the physics you're about to do).
-3. **Event Explorer** — real events are messy: several processes plus pileup
+1. From the home screen, **enter the LHC**. On the accelerator map, two proton
+   beams counter-rotate and **collide at four interaction points** — CMS and
+   ATLAS opposite each other, ALICE and LHCb on the other axis. Watch the beams
+   ramp to 6.8 TeV and the collisions flash. Click an experiment to learn about
+   it; click **CMS** to start analysing its collisions.
+2. Pick a mission from the campaign.
+3. Read the **briefing** (story + the physics you're about to do).
+4. **Event Explorer** — real events are messy: several processes plus pileup
    overlap in one display. Click objects to inspect their detector signals
    (track? reaches the muon chambers? isolated? displaced vertex?), identify
    them, and guess which process produced the event.
-4. **Analysis Lab** — the heart of the game. You get a whole dataset (a little
+5. **Analysis Lab** — the heart of the game. You get a whole dataset (a little
    signal buried in a lot of background). Enable **selection cuts** and drag
    their thresholds — require two muons, opposite charge, isolation, a b-jet
    veto, a mass window, missing energy, b-tags… Watch, live:
@@ -58,9 +63,10 @@ Z → μμ · W → μν · H → γγ · tt̄ (b-tagging) · HH → bbττ · (
 Pure vanilla HTML/CSS/JS with the HTML Canvas — no frameworks, no bundler.
 
 ```
-index.html              screens: home, campaign, briefing, explorer, lab, result
+index.html              screens: home, accelerator, campaign, briefing, explorer, lab, result
 styles.css              dark "control room" theme
 js/
+  accelerator.js        LHC map: counter-rotating beams, 4 IPs, collisions
   physics.js            invariant mass, 4-momenta, Asimov significance, RNG
   events.js             object types, processes, pileup, features, datasets
   missions.js           campaign config: stories, observables, processes, cuts

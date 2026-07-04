@@ -26,7 +26,42 @@
             <div class="readout-row"><span>Collision</span><b>proton–proton</b></div>
             <div class="readout-row"><span>Detector</span><b>CMS</b></div>
           </div>
-          <button id="enter-btn" class="btn btn-primary btn-big">▶ Enter the campaign</button>
+          <button id="enter-btn" class="btn btn-primary btn-big">▶ Enter the LHC</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== ACCELERATOR / LHC MAP ===================== -->
+    <section id="screen-accelerator" class="screen">
+      <div class="section-head">
+        <button class="btn btn-ghost" data-nav="home">← Home</button>
+        <h1>The Large Hadron Collider</h1>
+        <span class="muted" id="acc-status">Injecting…</span>
+      </div>
+      <div class="acc-grid">
+        <div class="panel acc-ring-panel">
+          <canvas id="acc-canvas" aria-label="LHC ring with beams and interaction points"></canvas>
+          <p class="muted small" id="acc-intro"></p>
+        </div>
+        <div class="side">
+          <div class="panel">
+            <h3 class="panel-title">Beam status</h3>
+            <div class="energy-row">
+              <span>Beam energy</span><b id="acc-energy">0.45 TeV</b>
+            </div>
+            <div class="energy-bar"><i id="acc-energy-fill"></i></div>
+            <div class="readout">
+              <div class="readout-row"><span>Collision</span><b>proton–proton</b></div>
+              <div class="readout-row"><span>Beams</span><b id="acc-beams">2 counter-rotating</b></div>
+              <div class="readout-row"><span>Luminosity</span><b>Medium</b></div>
+            </div>
+            <button id="acc-ramp" class="btn">↻ Re-ramp beams</button>
+          </div>
+          <div class="panel">
+            <h3 class="panel-title">Interaction point</h3>
+            <div id="acc-info" class="acc-info"></div>
+            <button id="acc-enter-cms" class="btn btn-primary">Enter CMS →</button>
+          </div>
         </div>
       </div>
     </section>
