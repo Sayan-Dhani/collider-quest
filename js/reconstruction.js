@@ -113,64 +113,51 @@ function renderTask(idx) {
 // --- task 1: track fitting ----------------------------------------------------
 
 function renderTrackFit(area, hintLv, onDone) {
-  // Generate 2-3 tracks with hits + some noise hits.
+  // Generate 2 tracks with hits + noise hits (more noise = "pileup" in
+  // advanced mode). The player assigns each hit to Track A or Track B — and
+  // the assignment is actually scored.
   const nTracks = 2;
-  const tracks = [];
   const allHits = [];
-  const colors = ['#4da6ff', '#ff8a3d', '#5be08a'];
+  const truthColors = ['#4da6ff', '#ff8a3d'];
+  const tabColors = ['#4da6ff', '#ff8a3d'];
   for (let t = 0; t < nTracks; t++) {
     const pt = randRange(15, 50);
     const charge = pick(['+', '-']);
-    const startAngle = randRange(0, 360);
-    const hits = [];
+    const startAngle = t === 0 ? randRange(0, 150) : randRange(180, 330); // keep them apart
     for (let i = 0; i < 5; i++) {
       const r = 15 + (i / 4) * 65;
       const bend = charge === '+' ? 1 : -1;
-      const phiOff = bend * (0.12 * (1 - 10 / (pt + 10))) * (i / 5);
+      const phiOff = bend * (0.35 * (1 - 10 / (pt + 10))) * (i / 5);
       const phi = degToRad(startAngle) + phiOff + gauss(0, 0.015);
-      hits.push({ x: 90 + r * Math.cos(phi), y: 90 - r * Math.sin(phi), track: t, idx: i, selected: false });
+      allHits.push({ x: 90 + r * Math.cos(phi), y: 90 - r * Math.sin(phi), track: t, idx: i, assigned: null });
     }
-    tracks.push(hits);
-    allHits.push(...hits);
   }
 
-  // Noise hits.
-  for (let i = 0; i < 3; i++) {
-    allHits.push({ x: randRange(20, 160), y: randRange(20, 160), track: -1, idx: -1, selected: false, noise: true });
+  // Noise hits — advanced mode gets real pileup clutter.
+  const nNoise = hintLv === 0 ? 8 : 3;
+  for (let i = 0; i < nNoise; i++) {
+    const r = randRange(15, 82), phi = randRange(0, Math.PI * 2);
+    allHits.push({ x: 90 + r * Math.cos(phi), y: 90 - r * Math.sin(phi), track: -1, idx: -1, assigned: null, noise: true });
   }
 
-  if (hintLv >= 2) {
-    // Beginner: assign colors.
-    for (const h of allHits) {
-      if (!h.noise) h.color = colors[h.track];
-      else h.color = '#54637a';
-    }
-  } else {
-    for (const h of allHits) h.color = '#8aa0b8';
+  for (const h of allHits) {
+    h.color = h.noise ? '#54637a' : (hintLv >= 2 ? truthColors[h.track] : '#8aa0b8');
   }
 
-  let trackAssignments = {};
   const c = document.createElement('canvas');
   c.width = 180; c.height = 180;
   c.style.cssText = 'width:180px;height:180px;border-radius:8px;background:#0e1620;border:1px solid #26364a;margin:8px auto;display:block';
-
   const ctx = c.getContext('2d');
 
   function draw() {
     ctx.clearRect(0, 0, 180, 180);
-    // Draw center.
     ctx.fillStyle = '#26364a';
     ctx.beginPath(); ctx.arc(90, 90, 4, 0, Math.PI * 2); ctx.fill();
-
     for (const h of allHits) {
-      ctx.beginPath(); ctx.arc(h.x, h.y, h.selected ? 6 : 4, 0, Math.PI * 2);
-      ctx.fillStyle = h.selected ? (h.noise ? '#ff6b6b' : h.color) : h.color;
+      ctx.beginPath(); ctx.arc(h.x, h.y, h.assigned != null ? 6 : 4, 0, Math.PI * 2);
+      ctx.fillStyle = h.assigned != null ? tabColors[h.assigned] : h.color;
       ctx.fill();
-      if (h.selected) {
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-      }
+      if (h.assigned != null) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 1; ctx.stroke(); }
     }
   }
   draw();
@@ -178,12 +165,12 @@ function renderTrackFit(area, hintLv, onDone) {
 
   let selectedTrack = 0;
   const controls = document.createElement('div');
-  controls.style.cssText = 'display:flex;gap:8px;align-items:center;justify-content:center;margin:6px 0';
+  controls.style.cssText = 'display:flex;gap:8px;align-items:center;justify-content:center;margin:6px 0;flex-wrap:wrap';
   controls.innerHTML = `
-    <span class="muted small">Assign to:</span>
-    <button class="btn chip rec-tab" data-t="0">Track A</button>
-    <button class="btn chip rec-tab" data-t="1">Track B</button>
-    <span id="rec-count" class="muted small">0 hits assigned</span>
+    <span class="muted small">Assign clicked hits to:</span>
+    <button class="btn chip rec-tab" data-t="0" style="border-color:#4da6ff">Track A</button>
+    <button class="btn chip rec-tab" data-t="1" style="border-color:#ff8a3d">Track B</button>
+    <span id="rec-count" class="muted small">0 / 10 hits assigned</span>
   `;
   controls.querySelectorAll('.rec-tab').forEach(b => {
     if (parseInt(b.dataset.t) === 0) b.classList.add('chip-active');
@@ -195,37 +182,51 @@ function renderTrackFit(area, hintLv, onDone) {
   });
   area.appendChild(controls);
 
-  let assignedCount = 0;
+  const fbArea = document.createElement('div');
+  area.appendChild(fbArea);
+
+  let assignedCount = 0, noiseClicks = 0;
   c.addEventListener('click', (e) => {
     const rect = c.getBoundingClientRect();
     const mx = (e.clientX - rect.left) * (180 / rect.width);
     const my = (e.clientY - rect.top) * (180 / rect.height);
-    const hit = allHits.find(h => !h.noise && !h.selected && Math.hypot(mx - h.x, my - h.y) < 8);
+    const hit = allHits.find(h => h.assigned == null && Math.hypot(mx - h.x, my - h.y) < 8);
     if (!hit) return;
-    hit.selected = true;
-    trackAssignments[hit.track] = (trackAssignments[hit.track] || 0) + 1;
+    if (hit.noise) {
+      // A real tracker rejects isolated hits that fit no smooth curve.
+      noiseClicks++;
+      fbArea.innerHTML = '<div class="feedback feedback-bad">That hit fits neither curve — it is detector noise / pileup. Real tracking software must reject these too.</div>';
+      return;
+    }
+    hit.assigned = selectedTrack;
     assignedCount++;
-    document.getElementById('rec-count').textContent = `${assignedCount} / 10 hits assigned`;
+    controls.querySelector('#rec-count').textContent = `${assignedCount} / 10 hits assigned`;
     draw();
     if (assignedCount >= 10) {
-      // Check if correct.
-      const correct = trackAssignments[0] === 5 && trackAssignments[1] === 5;
+      // Score the actual assignment: both consistent labelings count as
+      // correct (calling truth-0 "Track B" everywhere is still a valid fit).
+      const direct = allHits.filter(h => !h.noise && h.assigned === h.track).length;
+      const swapped = allHits.filter(h => !h.noise && h.assigned === 1 - h.track).length;
+      const nGood = Math.max(direct, swapped);
+      const correct = nGood === 10;
       const fb = document.createElement('div');
       fb.className = `feedback feedback-${correct ? 'good' : 'bad'}`;
       fb.textContent = correct
-        ? '✓ Correct! Each track has 5 hits in a helical pattern.'
-        : '✗ Some hits were mis-assigned. Each track follows a smooth curve.';
-      area.appendChild(fb);
+        ? `✓ Perfect fit! Each track is a smooth helix of 5 hits.${noiseClicks ? ` (You also correctly left ${noiseClicks > 1 ? 'the noise hits' : 'a noise hit'} out after probing ${noiseClicks === 1 ? 'it' : 'them'}.)` : ''}`
+        : `✗ ${10 - nGood} hit${10 - nGood > 1 ? 's were' : ' was'} put on the wrong track. Hits on one track follow a single smooth curve from the centre outward.`;
+      fbArea.innerHTML = '';
+      fbArea.appendChild(fb);
       controls.querySelectorAll('button').forEach(b => b.disabled = true);
-      setTimeout(onDone, 1200);
+      setTimeout(onDone, 1600);
     }
   });
 
-  // Hint.
   if (hintLv >= 1) {
     const hint = document.createElement('p');
     hint.className = 'muted small';
-    hint.textContent = hintLv >= 2 ? '💡 Hits of the same colour belong to the same track.' : '💡 Hits that form a smooth curve belong to the same track.';
+    hint.textContent = hintLv >= 2
+      ? '💡 Hits of the same colour belong to the same track — pick the matching tab, then click them.'
+      : '💡 Hits that form one smooth curve belong to the same track. Grey scattered hits are noise.';
     area.appendChild(hint);
   }
 }
@@ -240,63 +241,61 @@ function renderECALClustering(area, hintLv, onDone) {
     const nCrystals = isElectron ? randInt(3, 5) : randInt(4, 7);
     const totalE = randRange(20, 60);
     const crystals = [];
-    const cx = randRange(40, 140);
-    const cy = randRange(40, 140);
+    const ccx = randRange(50, 130);
+    const ccy = randRange(50, 130);
 
-    // Generate crystal positions around the cluster center.
+    // Cluster crystals around the shower centre.
     for (let j = 0; j < nCrystals; j++) {
       const angle = (j / nCrystals) * Math.PI * 2 + gauss(0, 0.3);
       const dist = randRange(4, 14);
       const energy = totalE / nCrystals * (1 + gauss(0, 0.15));
       crystals.push({
-        x: cx + dist * Math.cos(angle),
-        y: cy + dist * Math.sin(angle),
+        x: ccx + dist * Math.cos(angle),
+        y: ccy + dist * Math.sin(angle),
         energy: Math.max(0.5, energy),
         selected: false,
+        noise: false,
       });
+    }
+    // Scattered low-energy noise crystals that do NOT belong to the cluster
+    // (more of them in advanced mode — that is what pileup looks like in ECAL).
+    const nNoise = hintLv === 0 ? 6 : 3;
+    for (let j = 0; j < nNoise; j++) {
+      let nx, ny;
+      do { nx = randRange(15, 165); ny = randRange(15, 165); }
+      while (Math.hypot(nx - ccx, ny - ccy) < 34);
+      crystals.push({ x: nx, y: ny, energy: randRange(0.5, 3), selected: false, noise: true });
     }
 
     objects.push({
+      cx: ccx, cy: ccy, // cluster centre, used by the beginner track hint
       hasTrack: isElectron,
       crystals,
-      totalE: totalE.toFixed(0),
+      clusterE: crystals.filter(c => !c.noise).reduce((s, c) => s + c.energy, 0),
       answer: isElectron ? 'electron' : 'photon',
     });
   }
 
   let objIdx = 0;
 
-  function drawECAL() {
-    const o = objects[objIdx];
-    const c = document.createElement('canvas');
-    c.width = 180; c.height = 180;
-    c.style.cssText = 'width:180px;height:180px;border-radius:8px;background:#0e1620;border:1px solid #26364a;margin:8px auto;display:block';
-
-    const ctx = c.getContext('2d');
-
-    // Draw ECAL grid background.
+  function drawECAL(o, ctx) {
+    ctx.clearRect(0, 0, 180, 180);
+    // ECAL grid background.
     ctx.strokeStyle = 'rgba(255,225,77,0.08)';
     ctx.lineWidth = 0.5;
-    for (let x = 10; x < 180; x += 8) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 180); ctx.stroke();
-    }
-    for (let y = 10; y < 180; y += 8) {
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(180, y); ctx.stroke();
-    }
+    for (let x = 10; x < 180; x += 8) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 180); ctx.stroke(); }
+    for (let y = 10; y < 180; y += 8) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(180, y); ctx.stroke(); }
 
-    // Draw crystals.
     for (const cr of o.crystals) {
       const size = 6 + (cr.energy / 15) * 4;
       ctx.fillStyle = cr.selected
-        ? 'rgba(255,225,77,0.8)'
+        ? 'rgba(255,225,77,0.9)'
         : `rgba(255,225,77,${0.15 + (cr.energy / 60) * 0.5})`;
       ctx.fillRect(cr.x - size / 2, cr.y - size / 2, size, size);
-      ctx.strokeStyle = 'rgba(255,225,77,0.3)';
-      ctx.lineWidth = 0.5;
+      ctx.strokeStyle = cr.selected ? '#fff' : 'rgba(255,225,77,0.3)';
+      ctx.lineWidth = cr.selected ? 1 : 0.5;
       ctx.strokeRect(cr.x - size / 2, cr.y - size / 2, size, size);
-
-      // Energy label for beginner mode.
-      if (hintLv >= 2) {
+      if (hintLv >= 2 && !cr.noise) {
         ctx.fillStyle = '#0e1620';
         ctx.font = '7px system-ui';
         ctx.textAlign = 'center';
@@ -304,63 +303,91 @@ function renderECALClustering(area, hintLv, onDone) {
       }
     }
 
-    // Track indicator for electron (beginner mode).
+    // Beginner hint: dashed track pointing at the cluster centre (electron).
     if (hintLv >= 2 && o.hasTrack) {
       ctx.strokeStyle = '#4da6ff';
       ctx.lineWidth = 1.5;
       ctx.setLineDash([3, 3]);
-      ctx.beginPath();
-      ctx.moveTo(90, 180);
-      ctx.lineTo(cx, cy);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(90, 178); ctx.lineTo(o.cx, o.cy); ctx.stroke();
       ctx.setLineDash([]);
       ctx.fillStyle = '#4da6ff';
       ctx.font = '8px system-ui';
       ctx.textAlign = 'center';
-      ctx.fillText('track', cx, cy + 18);
+      ctx.fillText('track', o.cx, o.cy + 20);
     }
-
-    return c;
   }
 
   function showObject() {
     if (objIdx >= n) {
-      area.innerHTML = '<p class="muted">✓ All objects clustered and identified.</p>';
+      area.innerHTML = '<p class="muted">✓ All showers clustered and identified.</p>';
       setTimeout(onDone, 400);
       return;
     }
 
     const o = objects[objIdx];
+    const nClu = o.crystals.filter(c => !c.noise).length;
     area.innerHTML = `
-      <p class="muted">Object ${objIdx + 1} of ${n}: a cluster of ${o.crystals.length} ECAL crystals with total energy ${o.totalE} GeV. ${o.hasTrack ? 'A track points to it.' : 'No matching track.'}</p>
+      <p class="muted">Shower ${objIdx + 1} of ${n}: <b>click the adjacent bright crystals</b> to build the cluster
+      (leave the scattered dim ones out), then identify the particle.
+      ${o.hasTrack ? 'A track points at this shower.' : 'No track points at this shower.'}</p>
       <div id="rec-ecal-canvas"></div>
+      <p class="muted small" id="rec-ecal-sum">Cluster energy: 0 GeV (0 crystals)</p>
       <div style="display:flex;gap:8px;justify-content:center;margin:8px 0">
-        <button class="btn chip rec-id">Electron</button>
-        <button class="btn chip rec-id">Photon</button>
+        <button class="btn chip rec-id" disabled>Electron</button>
+        <button class="btn chip rec-id" disabled>Photon</button>
       </div>
       <div id="rec-ecal-fb"></div>`;
 
-    const canvasWrap = document.getElementById('rec-ecal-canvas');
-    canvasWrap.appendChild(drawECAL());
+    const c = document.createElement('canvas');
+    c.width = 180; c.height = 180;
+    c.style.cssText = 'width:180px;height:180px;border-radius:8px;background:#0e1620;border:1px solid #26364a;margin:8px auto;display:block;cursor:pointer';
+    area.querySelector('#rec-ecal-canvas').appendChild(c);
+    const ctx = c.getContext('2d');
+    drawECAL(o, ctx);
+
+    let sumE = 0, nSel = 0, noiseSel = 0;
+    c.addEventListener('click', (e) => {
+      const rect = c.getBoundingClientRect();
+      const mx = (e.clientX - rect.left) * (180 / rect.width);
+      const my = (e.clientY - rect.top) * (180 / rect.height);
+      const cr = o.crystals.find(k => !k.selected && Math.hypot(mx - k.x, my - k.y) < 9);
+      if (!cr) return;
+      cr.selected = true;
+      sumE += cr.energy;
+      if (cr.noise) noiseSel++; else nSel++;
+      drawECAL(o, ctx);
+      area.querySelector('#rec-ecal-sum').textContent =
+        `Cluster energy: ${sumE.toFixed(0)} GeV (${nSel + noiseSel} crystals)` +
+        (noiseSel ? ' — includes stray crystals far from the shower!' : '');
+      if (nSel >= nClu) {
+        area.querySelectorAll('.rec-id').forEach(b => { b.disabled = false; });
+      }
+    });
 
     area.querySelectorAll('.rec-id').forEach(b => {
       b.addEventListener('click', () => {
         const guess = b.textContent.toLowerCase();
         const correct = guess === o.answer;
-        const fb = document.getElementById('rec-ecal-fb');
+        const clean = noiseSel === 0;
+        const fb = area.querySelector('#rec-ecal-fb');
         fb.innerHTML = `<div class="feedback feedback-${correct ? 'good' : 'bad'}">${
-          correct ? '✓ Correct! ' + (o.answer === 'electron' ? 'Track + ECAL cluster = electron.' : 'ECAL cluster alone = photon.') : '✗ ' + (o.answer === 'electron' ? 'A track points to this cluster — it is an electron.' : 'No track — this is a photon.')
+          correct
+            ? `✓ Correct — ${o.answer === 'electron' ? 'track + ECAL cluster = electron' : 'ECAL cluster with no track = photon'}, E = ${o.clusterE.toFixed(0)} GeV.` +
+              (clean ? '' : ` But you swept ${noiseSel} stray crystal${noiseSel > 1 ? 's' : ''} into the cluster — that inflates the measured energy.`)
+            : `✗ ${o.answer === 'electron' ? 'A track points at this shower — it is an electron.' : 'No track points here — it is a photon.'}`
         }</div>`;
         area.querySelectorAll('.rec-id').forEach(bb => bb.disabled = true);
         objIdx++;
-        setTimeout(showObject, 800);
+        setTimeout(showObject, 1300);
       });
     });
 
     if (hintLv >= 1) {
       const hint = document.createElement('p');
       hint.className = 'muted small';
-      hint.textContent = hintLv >= 2 ? '💡 Electron = track + ECAL cluster. Photon = ECAL cluster only.' : '💡 Look at the track info to distinguish electron from photon.';
+      hint.textContent = hintLv >= 2
+        ? '💡 Electron = track + ECAL cluster. Photon = ECAL cluster only. Numbers show crystal energies.'
+        : '💡 The shower is the tight group of bright crystals; dim isolated crystals are noise.';
       area.appendChild(hint);
     }
   }

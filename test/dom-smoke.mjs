@@ -43,6 +43,7 @@ const screens = ['screen-home', 'screen-chain', 'screen-collisions', 'screen-cms
   .map((id) => { const e = mkEl('section'); e._attrs.id = id; e.id = id; byId.set(id, e); return e; });
 
 global.requestAnimationFrame = () => 0; // no recursion
+global.cancelAnimationFrame = () => {};
 // Pre-complete chapters 1-5 so smoke test goes directly to accelerator.
 global.localStorage = { _d: { cq_progress_v2: JSON.stringify(['chapter-1', 'chapter-2', 'chapter-3', 'chapter-4', 'chapter-5']) }, getItem(k) { return this._d[k] ?? null; }, setItem(k, v) { this._d[k] = v; } };
 global.document = {
@@ -94,6 +95,17 @@ step('click CMS enters campaign', () => {
   if (!grid._children.some((c) => (c._handlers.click || []).length)) throw new Error('campaign not rendered');
 });
 
+step('campaign shows 5 replayable chapter chips', () => {
+  const row = getEl('chapter-row');
+  const chips = row._children.filter((c) => (c._handlers.click || []).length);
+  if (chips.length !== 5) throw new Error(`expected 5 chapter chips, got ${chips.length}`);
+});
+step('replay chapter 1 renders Build the Beam', () => {
+  const chip = getEl('chapter-row')._children.find((c) => (c._handlers.click || []).length);
+  chip.click();
+  if (!getEl('chain-content')._children.length) throw new Error('chain step not rendered');
+});
+
 // find first mission card and open briefing
 step('open first mission briefing', () => {
   const grid = getEl('mission-grid');
@@ -133,6 +145,9 @@ step('explorer summary appears after final event', () => {
   if (!getEl('exp-summary-text').textContent) throw new Error('summary text empty');
 });
 step('summary hand-off -> analysis lab', () => getEl('exp-summary-lab').click());
+step('lab shows trigger provenance', () => {
+  if (!/trigger/i.test(getEl('lab-trigger').textContent)) throw new Error('lab trigger line empty');
+});
 step('toggle every cut on', () => {
   const panel = getEl('cuts-panel');
   // cut checkboxes are the first input in each cut-row; dispatch change=checked

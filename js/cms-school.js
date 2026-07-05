@@ -189,10 +189,17 @@ export function hitTestSubsystem(x, y) {
 
 function renderSubsystem(idx) {
   if (_allDone) return;
-  if (idx >= SUBSYSTEMS.length) {
-    _allDone = true;
-    _onComplete?.();
-    return;
+  // A lesson was completed (or the player jumped around): continue with the
+  // first subsystem not yet done; only when ALL five are done is the chapter
+  // complete. (Previously, finishing the outermost ring ended the chapter.)
+  if (idx >= SUBSYSTEMS.length || _completed.has(SUBSYSTEMS[idx]?.id)) {
+    const nextIdx = SUBSYSTEMS.findIndex((s) => !_completed.has(s.id));
+    if (nextIdx === -1) {
+      _allDone = true;
+      _onComplete?.();
+      return;
+    }
+    idx = nextIdx;
   }
   _activeIdx = idx;
   const s = SUBSYSTEMS[idx];
@@ -245,7 +252,7 @@ function renderSubsystem(idx) {
 // --- mini-games --------------------------------------------------------------
 
 function playTrackerGame(area, onDone) {
-  area.innerHTML = '<p class="muted">Click the 6 tracker hits in order from innermost to outermost to form a track.</p>';
+  area.innerHTML = '<p class="muted">Click the 6 tracker hits <b>in order from innermost to outermost</b> to form a track — that is how track-finding seeds work.</p>';
   const c = document.createElement('canvas');
   c.width = 200; c.height = 200;
   c.style.width = '200px'; c.style.height = '200px';
@@ -274,6 +281,12 @@ function playTrackerGame(area, onDone) {
 
   function drawGame() {
     ctx.clearRect(0, 0, 200, 200);
+    // Faint silicon layers, so "innermost to outermost" is visible.
+    ctx.strokeStyle = 'rgba(77,166,255,0.12)';
+    ctx.lineWidth = 1;
+    for (const h of hits) {
+      ctx.beginPath(); ctx.arc(cx, cy, h.r, 0, Math.PI * 2); ctx.stroke();
+    }
     // Draw track path for completed hits.
     const clicked = hits.filter(h => h.clicked).sort((a, b) => a.idx - b.idx);
     if (clicked.length >= 2) {
@@ -301,8 +314,16 @@ function playTrackerGame(area, onDone) {
     const rect = c.getBoundingClientRect();
     const mx = (e.clientX - rect.left) * (200 / rect.width);
     const my = (e.clientY - rect.top) * (200 / rect.height);
-    const hit = shuffled.find(h => !h.clicked && Math.hypot(mx - h.x, my - h.y) < 8);
+    const hit = shuffled.find(h => !h.clicked && Math.hypot(mx - h.x, my - h.y) < 9);
     if (!hit) return;
+    // Enforce the innermost-to-outermost order — the actual point of the game.
+    if (hit.idx !== nextIdx) {
+      ctx.beginPath(); ctx.arc(hit.x, hit.y, 8, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ff6b6b'; ctx.lineWidth = 2; ctx.stroke();
+      setTimeout(drawGame, 250);
+      return;
+    }
+    nextIdx++;
     hit.clicked = true;
     drawGame();
     if (hits.every(h => h.clicked)) {
@@ -398,7 +419,7 @@ function playECALGame(area, onDone) {
 
 function playHCALGame(area, onDone) {
   const nJets = randInt(2, 4);
-  area.innerHTML = `<p class="muted">A busy calorimeter. How many distinct jets can you see? (${nJets} in this event)</p>`;
+  area.innerHTML = '<p class="muted">A busy calorimeter. Jets show up as <b>clusters</b> of energetic towers. How many distinct jets can you see?</p>';
   const c = document.createElement('canvas');
   c.width = 280; c.height = 120;
   c.style.width = '280px'; c.style.height = '120px';
@@ -457,20 +478,23 @@ function playHCALGame(area, onDone) {
 }
 
 function playMuonGame(area, onDone) {
+  // 1-3 real muons among 4 tracks. The tell is the calorimeter readout: a
+  // muon deposits almost nothing there yet its track keeps going — the card
+  // does NOT say whether the muon chambers fired; the player must infer it.
   const n = 4;
-  const tracks = [];
-  for (let i = 0; i < n; i++) {
-    const isMuon = Math.random() < 0.5;
-    tracks.push({
-      label: `Track ${i + 1}`,
-      isMuon,
-      ecalE: isMuon ? randRange(1, 3).toFixed(1) : randRange(5, 40).toFixed(0),
-      hcalE: isMuon ? randRange(1, 4).toFixed(1) : randRange(10, 60).toFixed(0),
-      reachesMuon: isMuon ? '✓ Yes' : '✗ No (stops in HCAL)',
-    });
-  }
+  const nMuons = randInt(1, 3);
+  const flags = Array.from({ length: n }, (_, i) => i < nMuons);
+  flags.sort(() => Math.random() - 0.5);
+  const tracks = flags.map((isMuon, i) => ({
+    label: `Track ${i + 1}`,
+    isMuon,
+    pt: randRange(20, 60).toFixed(0),
+    ecalE: isMuon ? randRange(0.5, 2.5).toFixed(1) : randRange(8, 40).toFixed(0),
+    hcalE: isMuon ? randRange(0.5, 3.5).toFixed(1) : randRange(15, 60).toFixed(0),
+  }));
 
-  area.innerHTML = '<p class="muted">Which tracks reach the muon chambers? Click the muons.</p>';
+  area.innerHTML = '<p class="muted">Four charged tracks, each with tens of GeV of momentum. ' +
+    'Which of them punch through to the muon chambers? Select the muons, then check.</p>';
   const grid = document.createElement('div');
   grid.className = 'cms-muon-grid';
   const selected = new Set();
@@ -479,30 +503,36 @@ function playMuonGame(area, onDone) {
     const t = tracks[i];
     const card = document.createElement('button');
     card.className = 'cms-muon-card';
-    card.innerHTML = `<b>${t.label}</b><span>ECAL: ${t.ecalE} GeV</span><span>HCAL: ${t.hcalE} GeV</span><span>${t.reachesMuon}</span>`;
+    card.innerHTML = `<b>${t.label}</b><span>track pT: ${t.pt} GeV</span><span>ECAL: ${t.ecalE} GeV</span><span>HCAL: ${t.hcalE} GeV</span>`;
     card.addEventListener('click', () => {
       if (selected.has(i)) { selected.delete(i); card.classList.remove('cms-muon-sel'); }
       else { selected.add(i); card.classList.add('cms-muon-sel'); }
-      checkMuonDone();
     });
     grid.appendChild(card);
   }
   area.appendChild(grid);
 
+  const check = document.createElement('button');
+  check.className = 'btn btn-primary';
+  check.textContent = 'Check';
+  area.appendChild(check);
+
   const fb = document.createElement('div');
-  fb.id = 'muon-fb';
   area.appendChild(fb);
 
-  function checkMuonDone() {
-    if (selected.size < tracks.filter(t => t.isMuon).length) return;
-    const allMuons = tracks.filter(t => t.isMuon);
-    const correct = allMuons.every(t => selected.has(tracks.indexOf(t)));
+  check.addEventListener('click', () => {
+    const correct = tracks.every((t, i) => t.isMuon === selected.has(i));
     fb.innerHTML = `<div class="feedback feedback-${correct ? 'good' : 'bad'}">${
-      correct ? '✓ Correct! Only muons punch through to the outer chambers.' : '✗ Some selections are wrong — muons reach the muon chambers, other particles stop in the calorimeters.'
+      correct
+        ? '✓ Correct! A 40 GeV track that leaves only ~2 GeV in the calorimeters did not stop there — it punched through to the muon chambers. That mismatch is the muon signature.'
+        : `✗ Not quite — ${nMuons} of the tracks are muons. Look for tracks whose calorimeter deposits are tiny compared to their momentum: everything else stops in the calorimeters.`
     }</div>`;
-    area.querySelectorAll('.cms-muon-card').forEach(c => c.disabled = true);
-    setTimeout(onDone, 1200);
-  }
+    if (correct) {
+      area.querySelectorAll('.cms-muon-card').forEach(c => c.disabled = true);
+      check.disabled = true;
+      setTimeout(onDone, 1400);
+    }
+  });
 }
 
 function playMETGame(area, onDone) {
@@ -519,7 +549,7 @@ function playMETGame(area, onDone) {
     totalPy += pt * Math.sin(aRad);
   }
 
-  area.innerHTML = '<p class="muted">The visible pT vectors are shown. Click where the missing pT arrow should point.</p>';
+  area.innerHTML = '<p class="muted">The visible pT vectors are shown (blue). They do not balance — something invisible escaped. Click where the missing pT arrow should point.</p>';
 
   const wrap = document.createElement('div');
   wrap.style.cssText = 'position:relative;width:180px;height:180px;margin:8px auto';
@@ -527,10 +557,12 @@ function playMETGame(area, onDone) {
   c.width = 180; c.height = 180;
   c.style.cssText = 'width:180px;height:180px;border-radius:50%;background:#0e1620;border:1px solid #26364a;cursor:pointer';
   wrap.appendChild(c);
+  area.appendChild(wrap); // (was missing: the canvas never reached the DOM)
 
   const ctx = c.getContext('2d');
   const cx = 90, cy = 90;
   const scale = 40;
+  let showAnswer = false; // must exist before the first drawMET() call
 
   function drawMET() {
     ctx.clearRect(0, 0, 180, 180);
@@ -604,8 +636,6 @@ function playMETGame(area, onDone) {
   checkBtn.textContent = 'Check';
   area.appendChild(checkBtn);
 
-  let showAnswer = false;
-
   checkBtn.addEventListener('click', () => {
     showAnswer = true;
     drawMET();
@@ -622,7 +652,8 @@ function playMETGame(area, onDone) {
     ctx.fillText('your MET', cx + guess.x, cy + (guess.y > 0 ? guess.y + 16 : guess.y - 8));
 
     const metAngle = Math.atan2(-totalPy, -totalPx) * 180 / Math.PI;
-    const guessAngle = Math.atan2(guess.y, guess.x) * 180 / Math.PI;
+    // Canvas y grows downward, physics y grows upward: flip the click's y.
+    const guessAngle = Math.atan2(-guess.y, guess.x) * 180 / Math.PI;
     const diff = Math.abs(metAngle - guessAngle);
     const closeEnough = diff < 30 || diff > 330;
     const fb = document.createElement('div');

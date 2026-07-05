@@ -80,7 +80,8 @@ export const MISSIONS = [
       maxCut('met', 'Missing pT <', 'Z events have little genuine missing energy.', 'met', { min: 0, max: 100, def: 60, unit: 'GeV' }),
       windowCut('mass', 'Mass window |m − 91| <', 'Focus on the Z resonance.', 'dimuonMass', { center: 91.2, min: 1, max: 30, def: 25 }),
     ],
-    target: 12,
+    trigger: 'doubleMuon',
+    target: 18,
   },
 
   {
@@ -121,7 +122,8 @@ export const MISSIONS = [
       minCut('met', 'Missing pT >', 'The neutrino carries away real missing energy.', 'met', { min: 0, max: 80, def: 25, unit: 'GeV' }),
       toggle('bveto', 'b-jet veto', 'Suppress tt̄ background.', (f) => f.nBjets === 0),
     ],
-    target: 15,
+    trigger: 'singleMuon',
+    target: 20,
   },
 
   {
@@ -159,6 +161,7 @@ export const MISSIONS = [
       maxCut('gIso', 'Photon isolation <', 'Reject jets faking photons.', 'photonIso', { min: 0.05, max: 1, step: 0.05, def: 0.5 }),
       windowCut('mass', 'Mass window |m − 125| <', 'Zoom in on the Higgs region.', 'diphotonMass', { center: 125, min: 1, max: 40, def: 30 }),
     ],
+    trigger: 'doublePhoton',
     target: 5,
   },
 
@@ -197,6 +200,7 @@ export const MISSIONS = [
       minCut('njets', '≥ N jets', 'Top pair decays give many jets.', 'nJetsTotal', { min: 0, max: 6, def: 4, unit: '' }),
       minCut('btags', '≥ N b-tags', 'Both tops decay to b-quarks. Tagging finds ~70% of real b-jets, so demanding 2 costs signal too.', 'nBjets', { min: 0, max: 3, def: 2, unit: '' }),
     ],
+    trigger: 'singleMuon',
     target: 18,
   },
 
@@ -238,6 +242,7 @@ export const MISSIONS = [
       maxCut('tauIso', 'Tau ID quality (iso) <', 'Real taus are isolated; fake taus sit inside hadronic activity.', 'tauIso', { min: 0.05, max: 1, step: 0.05, def: 0.4 }),
       minCut('met', 'Missing pT >', 'Tau decays produce neutrinos → missing energy.', 'met', { min: 0, max: 80, def: 20, unit: 'GeV' }),
     ],
+    trigger: 'doubleTau',
     target: 3,
   },
 

@@ -47,7 +47,7 @@ const MACHINES = [
     id: 'ps',
     label: 'PS',
     icon: '◉',
-    subtitle: 'Proton Synchchrotron (628 m)',
+    subtitle: 'Proton Synchrotron (628 m)',
     energy: '26 GeV',
     desc: 'The PS shapes the continuous beam into discrete bunches using RF cavities. The phase must be precisely tuned — too early or late and the bunches become unstable.',
     task: 'Tune the RF phase to lock the bunches into stable orbits.',
@@ -61,8 +61,8 @@ const MACHINES = [
     icon: '⟳',
     subtitle: 'Super Proton Synchrotron (7 km)',
     energy: '450 GeV',
-    desc: 'The second-largest machine accelerates protons to 450 GeV. The beam must stay within the vacuum pipe aperture — too wide and it hits the walls, causing beam loss.',
-    task: 'Adjust the aperture while ramping to keep the beam centred.',
+    desc: 'The second-largest machine accelerates protons to 450 GeV. Each ramp step disturbs the beam and it blows up; the quadrupole magnets must squeeze it back down, or it hits the vacuum-pipe walls and is lost.',
+    task: 'Ramp the SPS, using the quadrupole focusing to keep the beam inside the aperture.',
     action: 'aperture',
     target: 5,
     unit: 'ramp pulses',
@@ -355,6 +355,19 @@ function buildFocusStep(idx, control, status) {
   const state = _stepState[idx];
   let currentRing = 0;
 
+  // Each ring wants a DIFFERENT focusing setting, away from where the slider
+  // starts, and the setting only locks when the player releases the slider
+  // ('change'), not while dragging through the zone ('input').
+  const zones = [];
+  for (let i = 0; i < m.target; i++) {
+    const lo = pickZone();
+    zones.push({ lo, hi: lo + 14 });
+  }
+  function pickZone() {
+    // A 14%-wide window that never contains the reset position (50%).
+    return Math.random() < 0.5 ? 8 + Math.random() * 22 : 62 + Math.random() * 22;
+  }
+
   // Visual ring indicators.
   const ringRow = document.createElement('div');
   ringRow.className = 'chain-ring-row';
@@ -385,45 +398,49 @@ function buildFocusStep(idx, control, status) {
   // Feedback text.
   const feedback = document.createElement('div');
   feedback.className = 'chain-focus-feedback';
-  feedback.textContent = `Ring ${currentRing + 1}: adjust focusing to 40–60%.`;
   control.appendChild(feedback);
 
+  const zoneMid = () => (zones[currentRing].lo + zones[currentRing].hi) / 2;
+  function liveFeedback(v) {
+    const z = zones[currentRing];
+    state.beamSize = Math.min(1, Math.abs(v - zoneMid()) / 50);
+    if (v < z.lo) feedback.textContent = '⬆ Beam too wide — increase focusing, then release.';
+    else if (v > z.hi) feedback.textContent = '⬇ Beam over-focused — decrease focusing, then release.';
+    else feedback.textContent = '● Focus looks good — release the slider to lock this ring.';
+  }
+  liveFeedback(50);
   status.textContent = `Ring 1 / ${m.target}`;
 
   slider.addEventListener('input', () => {
     const v = parseInt(slider.value);
     valLabel.textContent = v + '%';
+    liveFeedback(v);
+  });
 
-    // Update beam size visualization.
-    state.beamSize = Math.abs(v - 50) / 50;
+  // Lock on release only.
+  slider.addEventListener('change', () => {
+    const v = parseInt(slider.value);
+    const z = zones[currentRing];
+    if (v < z.lo || v > z.hi) return;
+    const dots = ringRow.querySelectorAll('.chain-ring-dot');
+    dots[currentRing].textContent = '✓';
+    dots[currentRing].classList.add('chain-ring-done');
+    currentRing++;
+    state.ringsDone = currentRing;
 
-    if (v >= 40 && v <= 60) {
-      // Good focus — lock this ring.
-      const dots = ringRow.querySelectorAll('.chain-ring-dot');
-      dots[currentRing].textContent = '✓';
-      dots[currentRing].classList.add('chain-ring-done');
-      currentRing++;
-      state.ringsDone = currentRing;
-
-      if (currentRing >= m.target) {
-        feedback.textContent = '✓ All rings focused! Beam intensity increased.';
-        feedback.classList.add('chain-focus-done');
-        slider.disabled = true;
-        advance(idx);
-      } else {
-        feedback.textContent = `Ring ${currentRing + 1}: adjust focusing to 40–60%.`;
-        status.textContent = `Ring ${currentRing + 1} / ${m.target}`;
-        slider.value = 50;
-        valLabel.textContent = '50%';
-        state.beamSize = 0.3;
-      }
-    } else if (v < 40) {
-      feedback.textContent = '⬆ Beam too wide — increase focusing.';
+    if (currentRing >= m.target) {
+      feedback.textContent = '✓ All four rings focused! Beam intensity increased.';
+      feedback.classList.add('chain-focus-done');
+      slider.disabled = true;
+      advance(idx);
     } else {
-      feedback.textContent = '⬇ Beam over-focused — decrease focusing.';
+      status.textContent = `Ring ${currentRing + 1} / ${m.target}`;
+      slider.value = 50;
+      valLabel.textContent = '50%';
+      state.beamSize = 0.3;
+      liveFeedback(50);
     }
   });
-  control.appendChild(slider);
 }
 
 function buildSliderStep(idx, control, status) {
@@ -436,7 +453,10 @@ function buildSliderStep(idx, control, status) {
   const valLabel = document.createElement('span');
   valLabel.className = 'chain-slider-val';
   valLabel.textContent = '50%';
-  const targetZone = { lo: 35, hi: 65 };
+  // The stable RF phase is somewhere the slider does NOT start, and it locks
+  // only when the player releases the slider inside the zone.
+  const lo = Math.random() < 0.5 ? 10 + Math.random() * 20 : 64 + Math.random() * 20;
+  const targetZone = { lo, hi: lo + 12 };
   let tuned = false;
 
   // Bunch visualization.
@@ -446,16 +466,16 @@ function buildSliderStep(idx, control, status) {
 
   function updateBunchVis(v) {
     const inZone = v >= targetZone.lo && v <= targetZone.hi;
-    const stability = inZone ? 1.0 : Math.max(0, 1 - Math.abs(v - 50) / 50);
+    const mid = (targetZone.lo + targetZone.hi) / 2;
+    const stability = inZone ? 1.0 : Math.max(0, 1 - Math.abs(v - mid) / 60);
     bunchVis.innerHTML = '';
 
-    // Draw bunches.
     const nBunches = 8;
     for (let i = 0; i < nBunches; i++) {
       const bunch = document.createElement('span');
       bunch.className = 'chain-bunch';
-      const offset = inZone ? 0 : (v < targetZone.lo ? (50 - v) / 50 * 6 : -(v - 50) / 50 * 6);
-      bunch.style.transform = `translateX(${offset + Math.sin(i * 0.8) * (inZone ? 0 : 3)}px)`;
+      const wobble = inZone ? 0 : (1 - stability) * 6;
+      bunch.style.transform = `translateX(${Math.sin(i * 0.8) * wobble}px)`;
       bunch.style.opacity = 0.3 + stability * 0.7;
       bunchVis.appendChild(bunch);
     }
@@ -465,17 +485,18 @@ function buildSliderStep(idx, control, status) {
     const v = parseInt(slider.value);
     valLabel.textContent = v + '%';
     updateBunchVis(v);
+    if (v < targetZone.lo) status.textContent = '⬆ Bunches drifting — increase the RF phase, then release.';
+    else if (v > targetZone.hi) status.textContent = '⬇ Bunches drifting — reduce the RF phase, then release.';
+    else status.textContent = '● Bunches look stable — release the slider to lock the phase.';
+  });
 
-    if (!tuned && v >= targetZone.lo && v <= targetZone.hi) {
-      tuned = true;
-      status.textContent = '✓ RF tuned! Bunches stabilised.';
-      slider.disabled = true;
-      advance(idx);
-    } else if (v < targetZone.lo) {
-      status.textContent = '⬆ Frequency too low — increase RF phase.';
-    } else if (v > targetZone.hi) {
-      status.textContent = '⬇ Frequency too high — reduce RF phase.';
-    }
+  slider.addEventListener('change', () => {
+    const v = parseInt(slider.value);
+    if (tuned || v < targetZone.lo || v > targetZone.hi) return;
+    tuned = true;
+    status.textContent = '✓ RF phase locked! The beam is now split into stable bunches.';
+    slider.disabled = true;
+    advance(idx);
   });
 
   const wrap = document.createElement('div');
@@ -483,31 +504,36 @@ function buildSliderStep(idx, control, status) {
   wrap.appendChild(slider);
   wrap.appendChild(valLabel);
   control.appendChild(wrap);
-  status.textContent = 'Adjust the RF phase to 35–65%.';
+  status.textContent = 'Find the stable RF phase — watch the bunches settle, then release.';
   updateBunchVis(50);
 }
 
 function buildApertureStep(idx, control, status) {
+  // The vacuum-pipe aperture is FIXED (dashed lines on the beam-pipe canvas).
+  // Each ramp pulse blows the beam up; the quadrupole-focusing slider squeezes
+  // it back. Ramping while the beam touches the walls is refused — beam loss.
   const m = MACHINES[idx];
   const state = _stepState[idx];
-  state.apertureFrac = 1.0;
-  state.beamSize = 0.3;
+  state.apertureFrac = 0.75;   // fixed pipe aperture
+  state.blowup = 0.35;         // grows with each ramp pulse
+  state.focus = 30;            // player-controlled squeeze (0-100)
+  const beamSize = () => Math.max(0.08, state.blowup * (1 - state.focus / 130));
 
-  // Aperture slider.
+  // Quadrupole focusing slider.
   const sliderWrap = document.createElement('div');
   sliderWrap.className = 'chain-slider-wrap';
   const sliderLabel = document.createElement('span');
   sliderLabel.className = 'chain-slider-val';
-  sliderLabel.textContent = 'Aperture:';
+  sliderLabel.textContent = 'Quadrupole focusing:';
   const slider = document.createElement('input');
   slider.type = 'range';
-  slider.min = 10;
+  slider.min = 0;
   slider.max = 100;
-  slider.value = 70;
+  slider.value = state.focus;
   slider.className = 'chain-slider';
   const valLabel = document.createElement('span');
   valLabel.className = 'chain-slider-val';
-  valLabel.textContent = '70%';
+  valLabel.textContent = state.focus + '%';
   sliderWrap.appendChild(sliderLabel);
   sliderWrap.appendChild(slider);
   sliderWrap.appendChild(valLabel);
@@ -522,44 +548,42 @@ function buildApertureStep(idx, control, status) {
   // Beam status indicator.
   const beamStatus = document.createElement('div');
   beamStatus.className = 'chain-beam-status';
-  beamStatus.textContent = 'Beam: centred';
   control.appendChild(beamStatus);
 
-  slider.addEventListener('input', () => {
-    state.apertureFrac = parseInt(slider.value) / 100;
-    valLabel.textContent = slider.value + '%';
-    updateBeamStatus();
-  });
-
   function updateBeamStatus() {
+    state.beamSize = beamSize();
     const beamH = 4 + state.beamSize * 8;
     const envelopeH = 12 * state.apertureFrac;
     if (beamH > envelopeH) {
-      beamStatus.textContent = '⚠ BEAM HITTING WALLS — reduce beam size!';
+      beamStatus.textContent = '⚠ BEAM TOUCHING THE WALLS — increase the quadrupole focusing!';
       beamStatus.className = 'chain-beam-status chain-beam-bad';
     } else if (beamH > envelopeH * 0.8) {
-      beamStatus.textContent = '⚡ Beam close to aperture limit.';
+      beamStatus.textContent = '⚡ Beam close to the aperture — more focusing would be safer.';
       beamStatus.className = 'chain-beam-status chain-beam-warn';
     } else {
-      beamStatus.textContent = '✓ Beam centred and stable.';
+      beamStatus.textContent = '✓ Beam well inside the aperture.';
       beamStatus.className = 'chain-beam-status chain-beam-good';
     }
   }
 
+  slider.addEventListener('input', () => {
+    state.focus = parseInt(slider.value);
+    valLabel.textContent = slider.value + '%';
+    updateBeamStatus();
+  });
+
   btn.addEventListener('click', () => {
-    const beamH = 4 + state.beamSize * 8;
-    const envelopeH = 12 * state.apertureFrac;
-    if (beamH > envelopeH) {
-      status.textContent = '⚠ Cannot ramp — beam is hitting the aperture walls!';
+    if (4 + beamSize() * 8 > 12 * state.apertureFrac) {
+      status.textContent = '⚠ Cannot ramp — the beam is scraping the walls. Squeeze it first.';
       return;
     }
     state.count++;
-    state.beamSize = Math.min(1.0, state.beamSize + 0.12);
+    state.blowup = Math.min(1.3, state.blowup + 0.18); // ramp disturbs the beam
     updateBeamStatus();
     const left = m.target - state.count;
     status.textContent = `${state.count} / ${m.target} ${m.unit}`;
     if (left <= 0) {
-      status.textContent = '✓ SPS ramp complete! Beam extracted to LHC.';
+      status.textContent = '✓ 450 GeV reached — beam extracted and injected into the LHC.';
       btn.disabled = true;
       slider.disabled = true;
       advance(idx);
@@ -567,7 +591,7 @@ function buildApertureStep(idx, control, status) {
   });
 
   updateBeamStatus();
-  status.textContent = `0 / ${m.target} ${m.unit} — adjust aperture, then ramp.`;
+  status.textContent = `0 / ${m.target} ${m.unit} — ramp, and keep the beam focused.`;
 }
 
 function buildFinalStep(idx, control, status) {

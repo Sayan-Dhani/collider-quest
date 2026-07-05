@@ -59,7 +59,26 @@ function show(id) {
 }
 
 // ============================ MISSION SELECT =================================
+// Replayable training-chapter chips above the mission grid.
+function renderChapterRow() {
+  const row = els.chapterRow;
+  if (!row) return;
+  row.innerHTML = '';
+  const label = document.createElement('span');
+  label.className = 'muted small';
+  label.textContent = 'Training chapters (replay any time):';
+  row.appendChild(label);
+  CHAPTERS.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.className = 'chip chapter-chip' + (progress.has(c.key) ? ' chapter-chip-done' : '');
+    b.textContent = `${progress.has(c.key) ? '✓ ' : ''}${i + 1} · ${c.title}`;
+    b.addEventListener('click', c.open);
+    row.appendChild(b);
+  });
+}
+
 function renderMissions() {
+  renderChapterRow();
   const grid = els.missionGrid;
   grid.innerHTML = '';
   let done = 0;
@@ -211,29 +230,25 @@ function renderFeedback(container, fb) {
 const BASE_LUMI_FB = 25; // "×1" on the slider ~ one good LHC data-taking year
 const lumiLabel = (l) => `${Math.round(BASE_LUMI_FB * l)} fb⁻¹`;
 
-function getChosenTriggerId() {
-  // Check runtime state first.
-  if (_chosenTriggerId) return _chosenTriggerId;
-  // Check progress for stored trigger.
-  for (const p of progress) {
-    if (p.startsWith('trigger-')) return p.replace('trigger-', '');
-  }
-  return 'minBias';
-}
-
 function openLab() {
-  const triggerId = getChosenTriggerId();
+  // Every analysis runs on data recorded by ITS OWN trigger path — events the
+  // trigger rejected were never written to disk and cannot appear here.
   lab = {
-    dataset: makeDataset(mission, 250, triggerId),
+    dataset: makeDataset(mission, 250, mission.trigger),
     states: initStates(mission),
     lumi: 1,
     result: null,
     impactEls: null,
-    triggerId,
   };
   $('lab-title').textContent = `${mission.title} — Analysis Lab`;
   $('lumi-range').value = 1;
   $('lumi-val').textContent = lumiLabel(1);
+  const trig = lab.dataset.trigger;
+  els.labTrigger.textContent = trig
+    ? `Dataset recorded by the ${trig.label.toLowerCase()} — it kept ` +
+      `${Math.round(trig.sigKept * 100)}% of the signal and already rejected ` +
+      `${Math.round((1 - trig.bkgKept) * 100)}% of the background before any offline cut.`
+    : '';
   lab.impactEls = renderCuts(els.cutsPanel, mission, lab.states, recomputeLab);
   recomputeLab();
   show('screen-lab');
@@ -309,13 +324,26 @@ function claimDiscovery() {
 }
 
 // ============================ TUTORIAL CHAPTERS (1-5) ======================
+const CHAPTERS = [
+  { key: 'chapter-1', title: 'Build the Beam', open: openChain },
+  { key: 'chapter-2', title: 'First Collisions', open: openCollisions },
+  { key: 'chapter-3', title: 'Inside CMS', open: openCMSschool },
+  { key: 'chapter-4', title: 'From Hits to Objects', open: openReconstruction },
+  { key: 'chapter-5', title: 'Trigger the Data', open: openTrigger },
+];
+
 function enterLHC() {
-  if (!progress.has('chapter-1')) return openChain();
-  if (!progress.has('chapter-2')) return openCollisions();
-  if (!progress.has('chapter-3')) return openCMSschool();
-  if (!progress.has('chapter-4')) return openReconstruction();
-  if (!progress.has('chapter-5')) return openTrigger();
+  const next = CHAPTERS.find((c) => !progress.has(c.key));
+  if (next) return next.open();
   openAccelerator();
+}
+
+// After a chapter finishes: continue the tour if chapters remain, otherwise
+// hand over to the live accelerator (also the landing spot after replays).
+function chapterDone(key) {
+  progress.add(key);
+  saveProgress();
+  enterLHC();
 }
 
 // --- Chapter 1 — Build the Beam ---------------------------------------------
@@ -323,24 +351,16 @@ function openChain() {
   els.chainIntro.textContent = CHAIN_INTRO;
   show('screen-chain');
   chain.startChain(els.chainCanvas, els.chainContent, {
-    onComplete: () => {
-      progress.add('chapter-1');
-      saveProgress();
-      openCollisions();
-    },
+    onComplete: () => chapterDone('chapter-1'),
   });
 }
 
-// ============================ CHAPTER 2 — FIRST COLLISIONS ==================
+// --- Chapter 2 — First Collisions -------------------------------------------
 function openCollisions() {
   els.collisionsIntro.textContent = COLLISIONS_INTRO;
   show('screen-collisions');
   collisions.startCollisions(els.collisionsContent, {
-    onComplete: () => {
-      progress.add('chapter-2');
-      saveProgress();
-      openCMSschool();
-    },
+    onComplete: () => chapterDone('chapter-2'),
   });
 }
 
@@ -349,11 +369,7 @@ function openCMSschool() {
   els.cmsIntro.textContent = CMS_SCHOOL_INTRO;
   show('screen-cms-school');
   cmsSchool.startCMSschool(els.cmsCanvas, els.cmsContent, {
-    onComplete: () => {
-      progress.add('chapter-3');
-      saveProgress();
-      openReconstruction();
-    },
+    onComplete: () => chapterDone('chapter-3'),
   });
 }
 
@@ -362,29 +378,27 @@ function openReconstruction() {
   els.reconstructionIntro.textContent = RECONSTRUCTION_INTRO;
   show('screen-reconstruction');
   reconstruction.startReconstruction(els.reconstructionContent, {
-    onComplete: () => {
-      progress.add('chapter-4');
-      saveProgress();
-      openTrigger();
-    },
+    onComplete: () => chapterDone('chapter-4'),
   });
 }
 
 // --- Chapter 5 — Trigger the Data -------------------------------------------
-let _chosenTriggerId = null;
-
 function openTrigger() {
   els.triggerIntro.textContent = TRIGGER_INTRO;
   show('screen-trigger');
+  const ctxId = mission ? mission.id : 'z-mumu';
+  const ctxMission = getMission(ctxId);
+  const sigProc = ctxMission.processes.find((p) => p.kind === 'signal').name;
   trigger.startTrigger(els.triggerContent, {
-    onComplete: () => {
-      _chosenTriggerId = trigger.getChosenTrigger();
-      progress.add('chapter-5');
-      progress.add('trigger-' + (_chosenTriggerId || 'minBias'));
-      saveProgress();
-      openAccelerator();
+    onComplete: () => chapterDone('chapter-5'),
+    context: ctxId,
+    contextLabel: ctxMission.tagline,
+    // Measured signal efficiency per trigger card: simulate n signal events.
+    sampleFeatures: (n) => {
+      const out = [];
+      for (let i = 0; i < n; i++) out.push(makeDisplayEvent(sigProc, 1).features);
+      return out;
     },
-    context: mission ? mission.id : 'z-mumu',
   });
 }
 
@@ -497,6 +511,8 @@ function init() {
     cutsPanel: $('cuts-panel'),
     metrics: $('metrics'),
     labHint: $('lab-hint'),
+    labTrigger: $('lab-trigger'),
+    chapterRow: $('chapter-row'),
     labCanvas: $('lab-canvas'),
     btnClaim: $('btn-claim'),
     resultStats: $('result-stats'),

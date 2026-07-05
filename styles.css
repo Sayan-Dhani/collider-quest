@@ -308,6 +308,22 @@ main { padding: 22px; max-width: 1200px; margin: 0 auto; }
 }
 .modal-close:hover { border-color: var(--accent); }
 
+/* ---- campaign chapter-replay row ---- */
+.chapter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }
+.chapter-chip { font-size: 12px; }
+.chapter-chip-done { border-color: rgba(52, 209, 127, 0.55); color: #b8f5d5; }
+
+/* ---- Analysis Lab trigger provenance line ---- */
+.lab-trigger {
+  margin: 0 0 10px; padding: 8px 10px; line-height: 1.45;
+  background: rgba(77, 166, 255, 0.07); border: 1px solid rgba(77, 166, 255, 0.3);
+  border-radius: 8px;
+}
+.lab-trigger:empty { display: none; }
+
+/* ---- trigger card requirement line ---- */
+.trigger-req { color: var(--accent); margin: 2px 0 6px; }
+
 /* ---- accessibility ---- */
 .btn:focus-visible, .chip:focus-visible, .mission-card:focus-visible,
 input[type=range]:focus-visible, input[type=checkbox]:focus-visible {

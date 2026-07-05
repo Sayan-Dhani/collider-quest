@@ -48,7 +48,7 @@ const COLLISION_TYPES = [
     id: 'pbpb',
     label: 'Lead–lead (PbPb)',
     icon: '⊛',
-    energy: '5.02 TeV per nucleon pair',
+    energy: '5.36 TeV per nucleon pair',
     lumiMax: 1e27,
     desc: 'Heavy-ion collisions create a quark–gluon plasma — hot, dense matter where quarks and gluons are deconfined. This is the state of the universe microseconds after the Big Bang.',
     experiments: ['CMS', 'ATLAS', 'ALICE'],
@@ -157,7 +157,7 @@ function renderSection2() {
       grid.querySelectorAll('.coll-type-card').forEach(c => c.classList.remove('coll-type-sel'));
       card.classList.add('coll-type-sel');
       _chosenType = ct.id;
-      setTimeout(renderSection3, 600);
+      setTimeout(() => renderSection3(ct.id), 600);
     });
     grid.appendChild(card);
   }
@@ -166,13 +166,22 @@ function renderSection2() {
 
 // --- Section 3: Luminosity & Pileup ------------------------------------------
 
-function renderSection3() {
+function renderSection3(chosenType) {
   _container.innerHTML = '';
   _section = 3;
 
   const h = document.createElement('h2');
   h.textContent = 'Luminosity, Pileup & Detector Readiness';
   _container.appendChild(h);
+
+  if (chosenType === 'pbpb') {
+    const note = document.createElement('div');
+    note.className = 'feedback feedback-good';
+    note.textContent =
+      'Lead–lead it is — the quark–gluon plasma campaign is coming in a future update. ' +
+      'For now the machine runs protons, so you can learn the discovery workflow first.';
+    _container.appendChild(note);
+  }
 
   const p1 = document.createElement('p');
   p1.className = 'muted';
@@ -242,9 +251,9 @@ function renderSection3() {
   trigInfo.className = 'coll-trig-info';
   trigInfo.id = 'coll-trig-info';
   trigInfo.innerHTML = `
-    <div class="coll-trig-label">Trigger bandwidth</div>
+    <div class="coll-trig-label">Trigger load</div>
     <div class="coll-trig-bar"><i id="trig-bar" class="coll-bar-fill coll-bar-trig" style="width:10%"></i></div>
-    <div class="coll-trig-val muted small" id="trig-val">~1 kHz recorded</div>
+    <div class="coll-trig-val muted small" id="trig-val">collisions: ~4 MHz → recorded: ~1 kHz</div>
   `;
   _container.appendChild(trigInfo);
 
@@ -263,10 +272,14 @@ function renderSection3() {
     document.getElementById('pileup-bar').style.width = pileupPct + '%';
     document.getElementById('rate-bar').style.width = ratePct + '%';
 
-    // Trigger bandwidth scales with luminosity.
+    // The recorded rate is FIXED by storage (~1 kHz) — what grows with
+    // luminosity is the collision rate the trigger must sift through, i.e.
+    // how selective it has to be.
     document.getElementById('trig-bar').style.width = ratePct + '%';
-    const trigRate = Math.round(100 + frac * 9900);
-    document.getElementById('trig-val').textContent = `~${trigRate >= 1000 ? (trigRate / 1000).toFixed(1) + ' MHz' : trigRate + ' kHz'} recorded`;
+    const collMHz = (frac * 40).toFixed(0);
+    const rejection = Math.max(1, Math.round((frac * 40e6) / 1000));
+    document.getElementById('trig-val').textContent =
+      `collisions: ~${collMHz} MHz → recorded: ~1 kHz (the trigger discards ${rejection.toLocaleString('en-US')} in every ${(rejection + 1).toLocaleString('en-US')})`;
 
     // Detector readiness: at very high lumi, data pipeline is stressed.
     const dataItem = detReady.querySelectorAll('.coll-det-item')[5];

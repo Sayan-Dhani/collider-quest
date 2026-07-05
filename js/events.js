@@ -15,6 +15,7 @@ import {
   pairMass, fourMomentum, invariantMass,
   rand, randRange, randInt, pick, gauss, degToRad,
 } from './physics.js';
+import { TRIGGERS } from './trigger.js'; // pure definitions, no DOM at import
 
 let _uid = 0;
 const uid = (p) => `${p}${_uid++}`;
@@ -262,6 +263,12 @@ const PROCESSES = {
     const close = toPolar(-px, -py);
     objs.push(lightJet(close.angle, Math.max(25, close.magnitude)));
     objs.push(mkFakeMuon((objs[0].angle + randRange(-12, 12) + 360) % 360, randRange(10, 30)));
+    // Sometimes a second jet fakes a muon too: QCD can then even fire a
+    // double-muon trigger (random charges — half the pairs are same-sign).
+    if (rand() < 0.35) {
+      const j = objs[Math.min(1, objs.length - 1)];
+      objs.push(mkFakeMuon((j.angle + randRange(-12, 12) + 360) % 360, randRange(10, 28)));
+    }
     const soft = rand() < 0.2 ? 18 : 6; // 20%: badly mismeasured jet
     return { objects: objs, met: metFromBalance(objs, soft) };
   },
@@ -316,7 +323,7 @@ const PROCESSES = {
   ttbar_lj() {
     const r = rand();
     const objs = [];
-    if (r < 0.015) {
+    if (r < 0.012) {
       // both Ws -> tau nu : 2 real taus + 2 b-jets, no light jets
       const [t1, t2] = twoBackToBack(60);
       objs.push(mkTau(pick(['+', '-']), t1, gauss(45, 12)));
@@ -475,51 +482,43 @@ export function makeDisplayEvent(processName, pileupLevel = 3) {
 // `mcPerProcess` MC events per process and weight each so the summed weights
 // reproduce the expected pre-cut yields (standard MC practice). 250/process
 // keeps rare-tail estimates (tau fakes, mistags) reasonably smooth.
-// `triggerId` is optionally a trigger ID from trigger.js; if provided, the
-// trigger selection is applied before offline cuts, reducing yields.
+//
+// `triggerId` names a trigger from trigger.js (usually `mission.trigger`).
+// Events that fail the trigger were never written to disk, so they simply do
+// not appear in the dataset — no offline cut can recover them. The returned
+// array carries a `.trigger` summary so the Lab can show what was lost.
 export function makeDataset(mission, mcPerProcess = 250, triggerId = null) {
-  // Import trigger definitions if a trigger is specified.
-  let triggerDef = null;
-  if (triggerId && triggerId !== 'minBias') {
-    try {
-      // Dynamic import not possible in sync context; use inline definitions.
-      const TRIGGER_DEFS = {
-        doubleMuon: (f) => f.nMuons >= 2 && f.leadMuonPt > 17,
-        singleMuon: (f) => f.nMuons >= 1 && f.leadMuonPt > 24,
-        doublePhoton: (f) => f.nPhotons >= 2 && f.leadPhotonPt > 30,
-        jetMET: (f) => f.nJets >= 2 && f.met > 30,
-      };
-      triggerDef = TRIGGER_DEFS[triggerId] || null;
-    } catch {}
-  }
-
+  const trig = triggerId ? TRIGGERS.find((t) => t.id === triggerId) : null;
   const events = [];
+  let sigAll = 0, sigRec = 0, bkgAll = 0, bkgRec = 0;
   for (const p of mission.processes) {
-    let w = p.expected / mcPerProcess;
+    const w = p.expected / mcPerProcess;
+    const isSignal = p.kind === 'signal';
     for (let i = 0; i < mcPerProcess; i++) {
       const { objects, met } = PROCESSES[p.name]();
       // light pileup so isolation/MET look realistic without dominating
       addPileup(objects, 1);
       const features = computeFeatures(objects, met);
 
-      // Apply trigger selection: if the event fails the trigger, it is not
-      // recorded (weight = 0). This reduces yields for mismatched triggers.
-      let recorded = true;
-      if (triggerDef) {
-        recorded = triggerDef(features);
-      }
+      if (isSignal) sigAll += w; else bkgAll += w;
+      if (trig && !trig.test(features)) continue; // never recorded
+      if (isSignal) sigRec += w; else bkgRec += w;
 
       events.push({
         processName: p.name,
-        truth: p.kind === 'signal' ? 'signal' : 'bkg',
-        weight: recorded ? w : 0,
-        recorded,
+        truth: isSignal ? 'signal' : 'bkg',
+        weight: w,
         features,
         // value that goes on the observable axis for this mission
         observable: features[mission.observable.feature] ?? null,
       });
     }
   }
+  events.trigger = trig
+    ? { id: trig.id, label: trig.label,
+        sigKept: sigAll > 0 ? sigRec / sigAll : 1,
+        bkgKept: bkgAll > 0 ? bkgRec / bkgAll : 1 }
+    : null;
   return events;
 }
 

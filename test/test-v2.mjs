@@ -161,18 +161,69 @@ function goodStates(m) {
 }
 for (const m of MISSIONS) {
   if (m.locked) continue;
-  const ds = makeDataset(m, 600); // dense MC: rare tails (tau fakes) matter
+  // Dense MC (rare tails matter), recorded through the mission's own trigger —
+  // exactly how the Analysis Lab builds its dataset.
+  const ds = makeDataset(m, 600, m.trigger);
   const r = computeResult(ds, m, goodStates(m));
   ok(r.significance >= m.target * 1.1,
     `${m.id}: significance ${r.significance.toFixed(1)}σ >= 1.1×target ${m.target}σ  (S=${r.S.toFixed(0)}, B=${r.B.toFixed(0)}, sigEff=${(r.sigEff*100)|0}%, bkgEff=${(r.bkgEff*100)|0}%)`);
 }
 
-// 9. No cuts => significance is low (there IS a discovery arc to climb).
+// 9. No cuts => significance is low (there IS a discovery arc to climb),
+// even though the trigger itself already rejected some background.
 for (const m of MISSIONS) {
   if (m.locked) continue;
-  const ds = makeDataset(m, 600);
+  const ds = makeDataset(m, 600, m.trigger);
   const r = computeResult(ds, m, initStates(m));
   ok(r.significance < m.target, `${m.id}: pre-cut significance ${r.significance.toFixed(1)}σ < target (arc exists)`);
+}
+
+// 9b. TRIGGER: every mission's trigger records most of its own signal, the
+// dataset carries a trigger summary, and rejected events are truly absent.
+{
+  const { TRIGGERS, getTrigger } = await import(`${R}/trigger.js`);
+  ok(TRIGGERS.length >= 6 && TRIGGERS.every(t => typeof t.test === 'function'),
+    `TRIGGERS registry has ${TRIGGERS.length} pure trigger definitions`);
+  for (const m of MISSIONS) {
+    if (m.locked) continue;
+    const ds = makeDataset(m, 300, m.trigger);
+    ok(ds.trigger && ds.trigger.id === m.trigger && ds.trigger.sigKept > 0.6,
+      `${m.id}: ${m.trigger} records ${(100 * ds.trigger.sigKept).toFixed(0)}% of signal (>60%)`);
+    const trig = getTrigger(m.trigger);
+    ok(ds.every(ev => trig.test(ev.features)),
+      `${m.id}: every dataset event passed the ${m.trigger} trigger`);
+  }
+  // A mismatched trigger really does lose the channel: Z→μμ through jet+MET.
+  const z = getMission('z-mumu');
+  const bad = makeDataset(z, 300, 'jetMET');
+  ok(bad.trigger.sigKept < 0.5,
+    `wrong trigger loses signal: jetMET keeps ${(100 * bad.trigger.sigKept).toFixed(0)}% of Z→μμ (<50%)`);
+}
+
+// 9c. Tutorial chapter modules stay DOM-free at import time (CLAUDE.md
+// invariant) and expose their teaching registries.
+{
+  const chainMod = await import(`${R}/chain.js`);
+  const cms = await import(`${R}/cms-school.js`);
+  const rec = await import(`${R}/reconstruction.js`);
+  ok(chainMod.MACHINES.length === 6 && chainMod.MACHINES[0].id === 'linac4' && chainMod.MACHINES[5].id === 'lhc',
+    'accelerator chain: Linac4 → ... → LHC (6 machines)');
+  ok(cms.SUBSYSTEMS.length === 5 && cms.SUBSYSTEMS.map(s => s.id).join(',') === 'tracker,ecal,hcal,muon,met',
+    'CMS school covers tracker, ECAL, HCAL, muon, MET');
+  ok(rec.TASKS.length === 3, 'reconstruction chapter has 3 tasks');
+}
+
+// 9d. generateRawHits: raw-hit view matches each object's detector signature.
+{
+  const { generateRawHits } = await import(`${R}/events.js`);
+  const muon = makeDisplayEvent('Z_mumu', 0).objects.find(o => o.kind === 'muon');
+  const hm = generateRawHits(muon);
+  ok(hm.trackerHits.length >= 4 && hm.muonHits.length >= 2,
+    `muon raw hits: ${hm.trackerHits.length} tracker + ${hm.muonHits.length} muon-station hits`);
+  const photon = makeDisplayEvent('H_gg', 0).objects.find(o => o.kind === 'photon');
+  const hp = generateRawHits(photon);
+  ok(hp.ecalCells.length >= 2 && hp.muonHits.length === 0,
+    `photon raw hits: ${hp.ecalCells.length} ECAL cells, no muon hits`);
 }
 
 // 10. binStacked buckets weighted signal correctly.

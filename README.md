@@ -33,11 +33,24 @@ The site is a static build deployed by GitHub Actions
 on a fork: enable **Settings → Pages → Source: GitHub Actions**, then push.
 
 ### How to play
-1. From the home screen, **enter the LHC**. On the accelerator map, two proton
-   beams counter-rotate and **collide at four interaction points** — CMS and
-   ATLAS opposite each other, ALICE and LHCb on the other axis. Watch the beams
-   ramp to 6.8 TeV and the collisions flash. Click an experiment to learn about
-   it; click **CMS** to start analysing its collisions.
+1. On a first play, **entering the LHC** walks you through five training
+   chapters (replayable any time from the campaign screen; a link on the home
+   screen skips them):
+   **Build the Beam** — drive the real CERN injector chain, Linac4 → stripping
+   foil → PS Booster → PS → SPS → LHC;
+   **First Collisions** — the four experiments, pp vs Pb–Pb, and the
+   luminosity ↔ pileup trade-off;
+   **Inside CMS** — one interactive lesson per subsystem (tracker, ECAL, HCAL,
+   muon chambers, missing pT);
+   **From Hits to Physics Objects** — reconstruction mini-games (track
+   fitting, ECAL clustering, particle flow) at three hint levels;
+   **Trigger the Data** — pick a trigger strategy and see the rate / storage /
+   signal-efficiency trade-off.
+2. Then the accelerator map: two proton beams counter-rotate and **collide at
+   four interaction points** — CMS and ATLAS opposite each other, ALICE and
+   LHCb on the other axis. Watch the beams ramp to 6.8 TeV and the collisions
+   flash. Click an experiment to learn about it; click **CMS** to start
+   analysing its collisions.
 2. Pick a mission from the campaign.
 3. Read the **briefing** (story + the physics you're about to do).
 4. **Event Explorer** — real events are messy: several processes plus pileup
@@ -63,13 +76,18 @@ Z → μμ · W → μν · H → γγ · tt̄ (b-tagging) · HH → bbττ · (
 Pure vanilla HTML/CSS/JS with the HTML Canvas — no frameworks, no bundler.
 
 ```
-index.html              screens: home, accelerator, campaign, briefing, explorer, lab, result
+index.html              screens: home, chapters 1-5, accelerator, campaign, briefing, explorer, lab, result
 styles.css              dark "control room" theme
 js/
+  chain.js              Chapter 1: CERN injector chain (Linac4 → ... → LHC)
+  collisions.js         Chapter 2: experiments, pp vs PbPb, luminosity & pileup
+  cms-school.js         Chapter 3: per-subsystem CMS lessons + mini-games
+  reconstruction.js     Chapter 4: track-fit / ECAL-clustering / particle-flow games
+  trigger.js            Chapter 5 UI + the shared TRIGGERS registry
   accelerator.js        LHC map: counter-rotating beams, 4 IPs, collisions
   physics.js            invariant mass, 4-momenta, Asimov significance, RNG
   events.js             object types, processes, pileup, features, datasets
-  missions.js           campaign config: stories, observables, processes, cuts
+  missions.js           campaign config: stories, observables, processes, cuts, triggers
   detector.js           CMS rendering (all object types + pileup) + hit-testing
   interaction.js        canvas mouse handling + object inspector
   analysis.js           cuts, significance, stacked histogram binning, cut UI
@@ -77,14 +95,16 @@ js/
   content.js            identities, hints, feedback, closing text
   main.js               campaign flow + screen router
 test/
-  test-v2.mjs           node tests: features, weighting, cuts, winnability
+  test-v2.mjs           node tests: features, weighting, cuts, triggers, winnability
 ```
 
 Everything is **data-driven from `missions.js`**. A mission declares its signal
-and background processes (with expected yields), which observable to plot, and
-which cuts the player can apply. The Explorer and Analysis Lab are generic — a
-new scenario is a new entry, not new engine code. The physics is deliberately
-simplified (educational, not a real simulation) but the *logic* is real:
+and background processes (with expected yields), which observable to plot,
+which cuts the player can apply — and **which trigger recorded its dataset**:
+events that fail the trigger never reach the Analysis Lab, and the Lab says so.
+The Explorer and Analysis Lab are generic — a new scenario is a new entry, not
+new engine code. The physics is deliberately simplified (educational, not a
+real simulation) but the *logic* is real:
 events **balance in the transverse plane** (missing pT is literally minus the
 vector sum of what you see, so W events point their MET away from the muon and
 the W transverse mass ends in a genuine Jacobian edge at 80.4 GeV), the
