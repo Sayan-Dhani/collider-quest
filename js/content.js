@@ -87,3 +87,54 @@ export const CLOSING =
   'You did not see these particles directly. You reconstructed them from traces, ' +
   'then separated a whisper of signal from a roar of background. That is ' +
   'experimental particle physics.';
+
+// --- Chapter 1 — Build the Beam strings -------------------------------------
+
+export const CHAIN_INTRO =
+  'Before particles collide in the LHC, they must travel through a chain of ' +
+  'accelerators — each one boosting their energy and preparing them for the ' +
+  'next stage. Guide the beam from the ion source all the way to the LHC.';
+
+export const CHAIN_COMPLETE =
+  'Your beam has travelled from the ion source, through four accelerators, ' +
+  'and now circulates in the LHC at 6.8 TeV per beam. Ready for collisions.';
+
+// --- Chapter 2 — First Collisions strings -----------------------------------
+
+export const COLLISIONS_INTRO =
+  'Now that the beam is ready, it is time to understand what happens when ' +
+  'protons collide. Meet the four experiments around the LHC ring and ' +
+  'learn how luminosity shapes the data you will analyse.';
+
+// --- Chapter 3 — Inside CMS strings -----------------------------------------
+
+export const CMS_SCHOOL_INTRO =
+  'The CMS detector is a layered cylindrical onion. Each layer measures something ' +
+  'different: tracking, electromagnetic energy, hadronic energy, and muons. ' +
+  'Explore each subsystem and learn how it contributes to particle identification.';
+
+export const CMS_SCHOOL_COMPLETE =
+  'You now understand how each CMS subsystem contributes to reconstructing ' +
+  'a collision. The layers work together — no single one tells the whole story.';
+
+// --- Chapter 4 — Reconstruction strings -------------------------------------
+
+export const RECONSTRUCTION_INTRO =
+  'Raw detector hits are just noise until they are assembled into tracks, ' +
+  'clusters, and physics objects. This is the reconstruction step — turning ' +
+  'electronic signals into particles you can analyse.';
+
+export const RECONSTRUCTION_COMPLETE =
+  'You have seen how raw hits become tracks, clusters, and identified particles. ' +
+  'In the Event Explorer, you will work with fully reconstructed objects.';
+
+// --- Chapter 5 — Trigger strings --------------------------------------------
+
+export const TRIGGER_INTRO =
+  'CMS cannot save every collision — 40 million events per second is too many. ' +
+  'The trigger system decides in microseconds which events to keep. Your choice ' +
+  'of trigger determines whether your signal is recorded at all.';
+
+export const TRIGGER_COMPLETE =
+  'You understand the trigger: a balance between keeping signal and managing ' +
+  'data rate. With the trigger in place, your data is ready for analysis.';

@@ -42,7 +42,7 @@ export function evalCut(cut, features, state) {
 export const MISSIONS = [
   {
     id: 'z-mumu',
-    chapter: 'Chapter 3',
+    chapter: 'Chapter 6',
     title: 'Rediscover the Z Boson',
     tagline: 'Z → μμ',
     difficulty: 'Beginner',
@@ -85,7 +85,7 @@ export const MISSIONS = [
 
   {
     id: 'w-munu',
-    chapter: 'Chapter 3',
+    chapter: 'Chapter 6',
     title: 'The W and the Invisible Neutrino',
     tagline: 'W → μν',
     difficulty: 'Beginner',
@@ -126,7 +126,7 @@ export const MISSIONS = [
 
   {
     id: 'higgs-gg',
-    chapter: 'Chapter 4',
+    chapter: 'Chapter 7',
     title: 'The Higgs in Two Photons',
     tagline: 'H → γγ',
     difficulty: 'Intermediate',
@@ -164,7 +164,7 @@ export const MISSIONS = [
 
   {
     id: 'top-lj',
-    chapter: 'Chapter 4',
+    chapter: 'Chapter 7',
     title: 'Top Quarks and b-Tagging',
     tagline: 'tt̄ → ℓ + jets',
     difficulty: 'Intermediate',
@@ -202,7 +202,7 @@ export const MISSIONS = [
 
   {
     id: 'hh-bbtautau',
-    chapter: 'Chapter 5',
+    chapter: 'Chapter 8',
     title: 'The Higgs-Pair Frontier',
     tagline: 'HH → bbττ',
     difficulty: 'Advanced',
@@ -243,7 +243,7 @@ export const MISSIONS = [
 
   {
     id: 'heavy-ion',
-    chapter: 'Chapter 6',
+    chapter: 'Chapter 9',
     title: 'Into the Fireball (Pb–Pb)',
     tagline: 'Heavy-ion — coming soon',
     difficulty: 'Advanced',

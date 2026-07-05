@@ -1,6 +1,6 @@
 // v2 logic tests: features, kinematics, dataset weighting, cuts, winnability.
 // Runs on a FIXED SEED so the stochastic assertions cannot flake.
-const R = '/eos/home-s/sadhani/claude_code_test/collider-quest/js';
+const R = '../js';
 const { makeDataset, makeDisplayEvent, PROCESSES } = await import(`${R}/events.js`);
 const { MISSIONS, getMission } = await import(`${R}/missions.js`);
 const { initStates, computeResult, binStacked, cutImpacts, confidenceLabel } = await import(`${R}/analysis.js`);

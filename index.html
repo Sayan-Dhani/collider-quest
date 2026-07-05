@@ -28,8 +28,74 @@
             <div class="readout-row"><span>Detector</span><b>CMS</b></div>
           </div>
           <button id="enter-btn" class="btn btn-primary btn-big">▶ Enter the LHC</button>
+          <p class="skip-tutorial-wrap"><a href="#" id="skip-tutorial">Already know the basics? Skip to the LHC →</a></p>
         </div>
       </div>
+    </section>
+
+    <!-- ===================== CHAIN — BUILD THE BEAM ===================== -->
+    <section id="screen-chain" class="screen">
+      <div class="section-head">
+        <button class="btn btn-ghost" data-nav="home">← Home</button>
+        <h1>Build the Beam</h1>
+        <span class="muted">Chapter 1</span>
+      </div>
+      <p class="muted chain-intro" id="chain-intro"></p>
+      <div class="chain-grid">
+        <div class="panel chain-canvas-wrap">
+          <canvas id="chain-canvas" aria-label="CERN accelerator chain: Linac4 → PS Booster → PS → SPS → LHC"></canvas>
+        </div>
+        <div id="chain-content" class="panel chain-step-panel"></div>
+      </div>
+    </section>
+
+    <!-- ===================== COLLISIONS — FIRST COLLISIONS ============== -->
+    <section id="screen-collisions" class="screen">
+      <div class="section-head">
+        <button class="btn btn-ghost" data-nav="home">← Home</button>
+        <h1>First Collisions</h1>
+        <span class="muted">Chapter 2</span>
+      </div>
+      <p class="muted" id="collisions-intro"></p>
+      <div id="collisions-content" class="panel"></div>
+    </section>
+
+    <!-- ===================== CMS SCHOOL (Chapter 3) ==================== -->
+    <section id="screen-cms-school" class="screen">
+      <div class="section-head">
+        <button class="btn btn-ghost" data-nav="home">← Home</button>
+        <h1>Inside CMS</h1>
+        <span class="muted">Chapter 3</span>
+      </div>
+      <p class="muted" id="cms-school-intro"></p>
+      <div class="cms-school-grid">
+        <div class="panel cms-cutaway-wrap">
+          <canvas id="cms-canvas" aria-label="CMS detector cutaway with clickable subsystems"></canvas>
+        </div>
+        <div id="cms-content" class="panel cms-content-panel"></div>
+      </div>
+    </section>
+
+    <!-- ===================== RECONSTRUCTION (Chapter 4) ================ -->
+    <section id="screen-reconstruction" class="screen">
+      <div class="section-head">
+        <button class="btn btn-ghost" data-nav="home">← Home</button>
+        <h1>From Hits to Physics Objects</h1>
+        <span class="muted">Chapter 4</span>
+      </div>
+      <p class="muted" id="reconstruction-intro"></p>
+      <div id="reconstruction-content" class="panel"></div>
+    </section>
+
+    <!-- ===================== TRIGGER (Chapter 5) ======================= -->
+    <section id="screen-trigger" class="screen">
+      <div class="section-head">
+        <button class="btn btn-ghost" data-nav="home">← Home</button>
+        <h1>Trigger the Data</h1>
+        <span class="muted">Chapter 5</span>
+      </div>
+      <p class="muted" id="trigger-intro"></p>
+      <div id="trigger-content" class="panel"></div>
     </section>
 
     <!-- ===================== ACCELERATOR / LHC MAP ===================== -->

@@ -497,4 +497,48 @@ export function makeDataset(mission, mcPerProcess = 250) {
   return events;
 }
 
+// --- raw detector hits -------------------------------------------------------
+// Generate simulated raw detector hits for an object, used by the
+// reconstruction chapter to teach how detector signals become physics objects.
+
+export function generateRawHits(obj) {
+  const nTrkHits = obj.kind === 'pileupTrack' ? 3 : 4 + Math.min(Math.floor(obj.pt / 15), 6);
+  const trackerHits = [];
+  for (let i = 0; i < nTrkHits; i++) {
+    const r = 4 + (i / Math.max(nTrkHits - 1, 1)) * 28;
+    const bend = ((obj.charge === '+' ? 1 : obj.charge === '-' ? -1 : 0) * 0.08 * (1 - 10 / (obj.pt + 10)));
+    const phi = degToRad(obj.angle) + bend * (i / nTrkHits) + gauss(0, 0.008);
+    trackerHits.push({ layer: i, r, phi, x: r * Math.cos(phi), y: r * Math.sin(phi) });
+  }
+
+  const ecalCells = [];
+  if (['muon', 'electron', 'photon', 'jet', 'bjet', 'tau'].includes(obj.kind)) {
+    const nCells = (obj.kind === 'jet' || obj.kind === 'bjet' ? 6 + randInt(0, 5) : 2 + randInt(0, 3));
+    for (let i = 0; i < nCells; i++) {
+      const dPhi = gauss(0, obj.kind === 'jet' || obj.kind === 'bjet' ? 0.06 : 0.02);
+      ecalCells.push({
+        energy: Math.max(0.1, obj.ecal / nCells * (1 + gauss(0, 0.12))),
+        eta: gauss(0, 0.03), phi: degToRad(obj.angle) + dPhi,
+      });
+    }
+  }
+
+  const hcalCells = [];
+  if (['jet', 'bjet', 'tau', 'muon'].includes(obj.kind)) {
+    const nCells = obj.kind === 'jet' || obj.kind === 'bjet' ? 4 + randInt(0, 4) : 1 + randInt(0, 2);
+    for (let i = 0; i < nCells; i++) {
+      hcalCells.push({
+        energy: Math.max(0.1, obj.hcal / nCells * (1 + gauss(0, 0.15))),
+        phi: degToRad(obj.angle) + gauss(0, obj.kind === 'jet' || obj.kind === 'bjet' ? 0.08 : 0.03),
+      });
+    }
+  }
+
+  const muonHits = obj.reachesMuonSystem
+    ? [{ station: 1, phi: degToRad(obj.angle) }, { station: 2, phi: degToRad(obj.angle) + gauss(0, 0.01) }]
+    : [];
+
+  return { trackerHits, ecalCells, hcalCells, muonHits };
+}
+
 export { PROCESSES };

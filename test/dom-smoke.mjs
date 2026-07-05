@@ -39,11 +39,12 @@ function ctxStub() {
 const byId = new Map();
 function getEl(id) { if (!byId.has(id)) byId.set(id, mkEl()); return byId.get(id); }
 
-const screens = ['screen-home', 'screen-accelerator', 'screen-missions', 'screen-briefing', 'screen-explorer', 'screen-lab', 'screen-result']
+const screens = ['screen-home', 'screen-chain', 'screen-collisions', 'screen-cms-school', 'screen-reconstruction', 'screen-trigger', 'screen-accelerator', 'screen-missions', 'screen-briefing', 'screen-explorer', 'screen-lab', 'screen-result']
   .map((id) => { const e = mkEl('section'); e._attrs.id = id; e.id = id; byId.set(id, e); return e; });
 
 global.requestAnimationFrame = () => 0; // no recursion
-global.localStorage = { _d: {}, getItem(k) { return this._d[k] ?? null; }, setItem(k, v) { this._d[k] = v; } };
+// Pre-complete chapters 1-5 so smoke test goes directly to accelerator.
+global.localStorage = { _d: { cq_progress_v2: JSON.stringify(['chapter-1', 'chapter-2', 'chapter-3', 'chapter-4', 'chapter-5']) }, getItem(k) { return this._d[k] ?? null; }, setItem(k, v) { this._d[k] = v; } };
 global.document = {
   getElementById: getEl,
   createElement: (t) => mkEl(t),

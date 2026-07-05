@@ -6,6 +6,11 @@ import { MISSIONS, getMission } from './missions.js';
 import { makeDisplayEvent, makeDataset } from './events.js';
 import * as detector from './detector.js';
 import * as accelerator from './accelerator.js';
+import * as chain from './chain.js';
+import * as collisions from './collisions.js';
+import * as cmsSchool from './cms-school.js';
+import * as reconstruction from './reconstruction.js';
+import * as trigger from './trigger.js';
 import { renderStacked } from './histogram.js';
 import { attachCanvas, renderInspector } from './interaction.js';
 import {
@@ -13,7 +18,11 @@ import {
   renderCuts, renderCutImpacts, renderMetrics, confidenceLabel,
 } from './analysis.js';
 import {
-  TAGLINE, HOME_INTRO, ACCELERATOR_INTRO, ACC_INFO_DEFAULT,
+  TAGLINE, HOME_INTRO, CHAIN_INTRO, CHAIN_COMPLETE,
+  COLLISIONS_INTRO, CMS_SCHOOL_INTRO, CMS_SCHOOL_COMPLETE,
+  RECONSTRUCTION_INTRO, RECONSTRUCTION_COMPLETE,
+  TRIGGER_INTRO, TRIGGER_COMPLETE,
+  ACCELERATOR_INTRO, ACC_INFO_DEFAULT,
   idFeedback, processFeedback, explorerSummary, resultHeadline, CLOSING,
 } from './content.js';
 
@@ -287,6 +296,82 @@ function claimDiscovery() {
   show('screen-result');
 }
 
+// ============================ TUTORIAL CHAPTERS (1-5) ======================
+function enterLHC() {
+  if (!progress.has('chapter-1')) return openChain();
+  if (!progress.has('chapter-2')) return openCollisions();
+  if (!progress.has('chapter-3')) return openCMSschool();
+  if (!progress.has('chapter-4')) return openReconstruction();
+  if (!progress.has('chapter-5')) return openTrigger();
+  openAccelerator();
+}
+
+// --- Chapter 1 — Build the Beam ---------------------------------------------
+function openChain() {
+  els.chainIntro.textContent = CHAIN_INTRO;
+  show('screen-chain');
+  chain.startChain(els.chainCanvas, els.chainContent, {
+    onComplete: () => {
+      progress.add('chapter-1');
+      saveProgress();
+      openCollisions();
+    },
+  });
+}
+
+// ============================ CHAPTER 2 — FIRST COLLISIONS ==================
+function openCollisions() {
+  els.collisionsIntro.textContent = COLLISIONS_INTRO;
+  show('screen-collisions');
+  collisions.startCollisions(els.collisionsContent, {
+    onComplete: () => {
+      progress.add('chapter-2');
+      saveProgress();
+      openCMSschool();
+    },
+  });
+}
+
+// --- Chapter 3 — Inside CMS -------------------------------------------------
+function openCMSschool() {
+  els.cmsIntro.textContent = CMS_SCHOOL_INTRO;
+  show('screen-cms-school');
+  cmsSchool.startCMSschool(els.cmsCanvas, els.cmsContent, {
+    onComplete: () => {
+      progress.add('chapter-3');
+      saveProgress();
+      openReconstruction();
+    },
+  });
+}
+
+// --- Chapter 4 — From Hits to Objects ---------------------------------------
+function openReconstruction() {
+  els.reconstructionIntro.textContent = RECONSTRUCTION_INTRO;
+  show('screen-reconstruction');
+  reconstruction.startReconstruction(els.reconstructionContent, {
+    onComplete: () => {
+      progress.add('chapter-4');
+      saveProgress();
+      openTrigger();
+    },
+  });
+}
+
+// --- Chapter 5 — Trigger the Data -------------------------------------------
+function openTrigger() {
+  els.triggerIntro.textContent = TRIGGER_INTRO;
+  show('screen-trigger');
+  trigger.startTrigger(els.triggerContent, {
+    onComplete: () => {
+      progress.add('chapter-5');
+      saveProgress();
+      openAccelerator();
+    },
+    context: 'z-mumu',
+  });
+}
+
 // ============================ ACCELERATOR / LHC MAP =========================
 const homeTeaser = accelerator.createState();
 
@@ -402,11 +487,25 @@ function init() {
     resultClosing: $('result-closing'),
     resultCanvas: $('result-canvas'),
     resultNext: $('result-next'),
+    chainCanvas: $('chain-canvas'),
+    chainContent: $('chain-content'),
+    chainIntro: $('chain-intro'),
+    collisionsContent: $('collisions-content'),
+    collisionsIntro: $('collisions-intro'),
+    cmsCanvas: $('cms-canvas'),
+    cmsContent: $('cms-content'),
+    cmsIntro: $('cms-school-intro'),
+    reconstructionContent: $('reconstruction-content'),
+    reconstructionIntro: $('reconstruction-intro'),
+    triggerContent: $('trigger-content'),
+    triggerIntro: $('trigger-intro'),
     detectorModal: $('detector-modal'),
   };
 
   sizeCanvas(els.lhcCanvas, 420, 420);
   sizeCanvas(els.accCanvas, 520, 520);
+  sizeCanvas(els.chainCanvas, 700, 160);
+  sizeCanvas(els.cmsCanvas, 240, 240);
   sizeCanvas(els.detectorCanvas, 560, 560);
   sizeCanvas(els.labCanvas, 560, 300);
   sizeCanvas(els.resultCanvas, 520, 300);
@@ -415,11 +514,15 @@ function init() {
   $('home-intro').textContent = HOME_INTRO;
 
   // Navigation.
-  $('enter-btn').addEventListener('click', openAccelerator);
+  $('enter-btn').addEventListener('click', enterLHC);
+  $('skip-tutorial').addEventListener('click', (e) => {
+    e.preventDefault();
+    openAccelerator();
+  });
   for (const b of document.querySelectorAll('[data-nav]')) {
     b.addEventListener('click', () => {
       const t = b.getAttribute('data-nav');
-      if (t === 'home') show('screen-home');
+      if (t === 'home') { chain.stopChain(); cmsSchool.stopCMSschool(); show('screen-home'); }
       else if (t === 'missions') renderMissions();
       else if (t === 'briefing') openBriefing(mission);
     });
