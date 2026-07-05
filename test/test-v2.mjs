@@ -55,14 +55,52 @@ const ok = (c, m) => { console.log((c ? '  ok  ' : ' FAIL ') + m); if (!c) fail+
   }
 }
 
-// 3. ttbar_2mu has b-jets and real (balance-derived) MET; QCD fakes non-isolated.
+// 3. IMPERFECT TAGGING: ttbar's two true b-jets are tagged with ~70%
+// efficiency each (avg ~1.4 tags), MET is real; QCD fakes non-isolated.
 {
-  let bj = 0, met = 0, n = 200;
+  let bj = 0, met = 0, n = 400;
   for (let i = 0; i < n; i++) { const f = makeDisplayEvent('ttbar_2mu', 1).features; bj += f.nBjets; met += f.met; }
-  ok(bj / n > 1.5, `ttbar avg b-jets ${(bj/n).toFixed(1)} (>1.5)`);
+  ok(bj / n > 1.2 && bj / n < 1.6, `ttbar avg b-tags ${(bj/n).toFixed(2)} (~1.4: 2 true b × 70% eff)`);
   ok(met / n > 30, `ttbar avg MET ${(met/n).toFixed(0)} GeV (>30)`);
   let iso = 0; for (let i = 0; i < n; i++) iso += makeDisplayEvent('QCD_fake', 1).features.muonIso;
   ok(iso / n > 0.25, `QCD fake muon avg iso ${(iso/n).toFixed(2)} (non-isolated)`);
+}
+
+// 3b. TAU FAKES + HH REALISM: light jets fake loose taus at a visible rate,
+// real taus are isolated while fakes are not, and m(bb) reconstructs the
+// Higgs (a bit below 125, as briefed).
+{
+  const n = 500;
+  let fakeTaus = 0, realIso = 0, realN = 0;
+  for (let i = 0; i < n; i++) {
+    const e = makeDisplayEvent('Wjets', 0);
+    fakeTaus += e.features.nTaus;
+  }
+  ok(fakeTaus / n > 0.1 && fakeTaus / n < 0.8,
+    `Wjets avg fake-tau candidates ${(fakeTaus/n).toFixed(2)} (jets fake loose taus)`);
+  let mbbSum = 0, mbbN = 0;
+  for (let i = 0; i < n; i++) {
+    const e = makeDisplayEvent('HH_bbtautau', 0);
+    for (const o of e.objects) if (o.kind === 'tau' && o.truthLabel === 'Tau') { realIso += o.iso; realN++; }
+    if (e.features.mbb != null) { mbbSum += e.features.mbb; mbbN++; }
+  }
+  ok(realN > 0 && realIso / realN < 0.15, `real taus are isolated (avg iso ${(realIso/realN).toFixed(2)})`);
+  ok(mbbN / n > 0.35 && mbbN / n < 0.65,
+    `HH double-b-tag fraction ${(mbbN/n).toFixed(2)} (~0.49 = 70%²)`);
+  const mbbMean = mbbSum / mbbN;
+  ok(mbbMean > 100 && mbbMean < 125, `HH m(bb) mean ${mbbMean.toFixed(0)} GeV (Higgs, shifted below 125)`);
+}
+
+// 3c. NO MAGIC BULLET: the "≥2 taus" toggle ALONE no longer reaches the HH
+// target — fake taus keep enough background alive. Quality cuts are required.
+{
+  const m = getMission('hh-bbtautau');
+  const ds = makeDataset(m, 600);
+  const s = initStates(m);
+  s.twoTau.enabled = true;
+  const r = computeResult(ds, m, s);
+  ok(r.significance < m.target,
+    `hh: tau toggle alone gives ${r.significance.toFixed(1)}σ < ${m.target}σ target (S=${r.S.toFixed(0)}, B=${r.B.toFixed(0)})`);
 }
 
 // 4. W JACOBIAN EDGE: mT piles up below the W mass and dies above it.
@@ -123,7 +161,7 @@ function goodStates(m) {
 }
 for (const m of MISSIONS) {
   if (m.locked) continue;
-  const ds = makeDataset(m, 200);
+  const ds = makeDataset(m, 600); // dense MC: rare tails (tau fakes) matter
   const r = computeResult(ds, m, goodStates(m));
   ok(r.significance >= m.target * 1.1,
     `${m.id}: significance ${r.significance.toFixed(1)}σ >= 1.1×target ${m.target}σ  (S=${r.S.toFixed(0)}, B=${r.B.toFixed(0)}, sigEff=${(r.sigEff*100)|0}%, bkgEff=${(r.bkgEff*100)|0}%)`);
@@ -132,7 +170,7 @@ for (const m of MISSIONS) {
 // 9. No cuts => significance is low (there IS a discovery arc to climb).
 for (const m of MISSIONS) {
   if (m.locked) continue;
-  const ds = makeDataset(m, 200);
+  const ds = makeDataset(m, 600);
   const r = computeResult(ds, m, initStates(m));
   ok(r.significance < m.target, `${m.id}: pre-cut significance ${r.significance.toFixed(1)}σ < target (arc exists)`);
 }

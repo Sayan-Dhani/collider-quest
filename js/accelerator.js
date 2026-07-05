@@ -77,10 +77,12 @@ function updateRamp(state, now) {
 
 let _geom = null;
 
+// Logical-pixel geometry (canvases carry a devicePixelRatio backing store).
 function computeGeom(canvas) {
-  const cx = canvas.width / 2, cy = canvas.height / 2;
-  const R = Math.min(canvas.width, canvas.height) / 2 - 52;
-  return { cx, cy, R };
+  const dpr = canvas._dpr || 1;
+  const w = canvas.width / dpr, h = canvas.height / dpr;
+  const R = Math.min(w, h) / 2 - 52;
+  return { w, h, cx: w / 2, cy: h / 2, R };
 }
 
 // Polar -> pixels, with y flipped so angle 90deg is at the top.
@@ -94,13 +96,15 @@ function pt(g, r, angleDeg) {
 // view = { hoveredId, mode: 'full'|'teaser', now }
 export function draw(canvas, state, view = {}) {
   const ctx = canvas.getContext('2d');
+  const dpr = canvas._dpr || 1;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   const g = computeGeom(canvas);
   _geom = g;
   const now = view.now ?? nowMs();
   const teaser = view.mode === 'teaser';
 
   updateRamp(state, now);
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0, 0, g.w, g.h);
 
   drawRing(ctx, g);
   const frac = energyFraction(state);

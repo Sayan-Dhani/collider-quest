@@ -7,7 +7,9 @@ const PAD = { left: 46, right: 12, top: 16, bottom: 34 };
 // data = { sig:[], bkg:[], xmin, xmax, bins }; observable = { name, unit, target }
 export function renderStacked(canvas, data, observable) {
   const ctx = canvas.getContext('2d');
-  const W = canvas.width, H = canvas.height;
+  const dpr = canvas._dpr || 1;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const W = canvas.width / dpr, H = canvas.height / dpr;
   ctx.clearRect(0, 0, W, H);
 
   const plotW = W - PAD.left - PAD.right;
@@ -28,7 +30,7 @@ export function renderStacked(canvas, data, observable) {
 
   // Y gridlines + labels.
   ctx.fillStyle = '#8aa0b8';
-  ctx.font = '10px system-ui, sans-serif';
+  ctx.font = '11px system-ui, sans-serif';
   ctx.textAlign = 'right';
   for (let g = 0; g <= 4; g++) {
     const yy = y0 - (g / 4) * plotH;

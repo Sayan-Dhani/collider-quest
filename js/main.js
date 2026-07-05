@@ -290,16 +290,27 @@ function claimDiscovery() {
 // ============================ ACCELERATOR / LHC MAP =========================
 const homeTeaser = accelerator.createState();
 
+// Respect prefers-reduced-motion: draw single static frames instead of
+// running the permanent animation loops.
+const REDUCED_MOTION =
+  typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 // Home shows a calm, non-interactive teaser of the same ring.
 function drawHomeTeaser() {
   if (els.lhcCanvas) accelerator.draw(els.lhcCanvas, homeTeaser, { mode: 'teaser' });
-  requestAnimationFrame(drawHomeTeaser);
+  if (!REDUCED_MOTION) requestAnimationFrame(drawHomeTeaser);
 }
 
 function openAccelerator() {
   acc = accelerator.createState();
   accHover = null;
-  accelerator.startRamp(acc);
+  if (REDUCED_MOTION) {
+    // Skip the animated ramp: jump straight to stable beams.
+    acc.energy = accelerator.ENERGY.COLLISION_TEV;
+    acc.colliding = true;
+  } else {
+    accelerator.startRamp(acc);
+  }
   $('acc-intro').textContent = ACCELERATOR_INTRO;
   els.accInfo.innerHTML = ACC_INFO_DEFAULT;
   show('screen-accelerator');
@@ -316,13 +327,14 @@ function drawAcceleratorFrame() {
   els.accStatus.textContent = acc.colliding
     ? 'Stable beams — colliding'
     : acc.ramping ? 'Ramping beams…' : 'Injecting…';
-  requestAnimationFrame(drawAcceleratorFrame);
+  if (!REDUCED_MOTION) requestAnimationFrame(drawAcceleratorFrame);
 }
 
 function accCoords(evt) {
   const c = els.accCanvas, rect = c.getBoundingClientRect();
-  return { x: (evt.clientX - rect.left) * (c.width / rect.width),
-           y: (evt.clientY - rect.top) * (c.height / rect.height) };
+  const dpr = c._dpr || 1;
+  return { x: (evt.clientX - rect.left) * (c.width / dpr / rect.width),
+           y: (evt.clientY - rect.top) * (c.height / dpr / rect.height) };
 }
 
 function onAccMove(evt) {
@@ -355,7 +367,15 @@ function openDetectorModal() { els.detectorModal.hidden = false; }
 function closeDetectorModal() { els.detectorModal.hidden = true; }
 
 // ============================ INIT ==========================================
-function sizeCanvas(c, w, h) { c.width = w; c.height = h; }
+// Hi-DPI: back the canvas with devicePixelRatio× pixels (capped at 2) and let
+// the renderers scale the context once per frame, so drawing, hit-testing and
+// CSS layout all keep working in logical pixels.
+function sizeCanvas(c, w, h) {
+  const dpr = Math.min(2, (typeof window !== 'undefined' && window.devicePixelRatio) || 1);
+  c._dpr = dpr;
+  c.width = w * dpr;
+  c.height = h * dpr;
+}
 
 function init() {
   els = {

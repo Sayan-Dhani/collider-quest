@@ -76,7 +76,7 @@ export const MISSIONS = [
       toggle('os', 'Opposite charge', 'A Z is neutral: its muons have opposite charge.', (f) => f.oppositeCharge),
       minCut('muPt', 'Muon pT >', 'Reject soft fake muons.', 'leadMuonPt', { min: 0, max: 40, def: 20, unit: 'GeV' }),
       maxCut('muIso', 'Muon isolation <', 'Real muons are isolated; fakes sit inside jets.', 'muonIso', { min: 0.05, max: 1, step: 0.05, def: 0.5 }),
-      toggle('bveto', 'b-jet veto', 'Remove tt̄ by rejecting events with b-jets.', (f) => f.nBjets === 0),
+      toggle('bveto', 'b-jet veto', 'Remove tt̄ by rejecting b-tagged events (tagging catches ~70% of real b-jets).', (f) => f.nBjets === 0),
       maxCut('met', 'Missing pT <', 'Z events have little genuine missing energy.', 'met', { min: 0, max: 100, def: 60, unit: 'GeV' }),
       windowCut('mass', 'Mass window |m − 91| <', 'Focus on the Z resonance.', 'dimuonMass', { center: 91.2, min: 1, max: 30, def: 25 }),
     ],
@@ -195,7 +195,7 @@ export const MISSIONS = [
       maxCut('lepIso', 'Lepton isolation <', 'Real W leptons are isolated; QCD fakes sit inside jets.', 'muonIso', { min: 0.05, max: 1, step: 0.05, def: 0.5 }),
       minCut('met', 'Missing pT >', 'The neutrino gives real missing energy.', 'met', { min: 0, max: 80, def: 25, unit: 'GeV' }),
       minCut('njets', '≥ N jets', 'Top pair decays give many jets.', 'nJetsTotal', { min: 0, max: 6, def: 4, unit: '' }),
-      minCut('btags', '≥ N b-tags', 'Both tops decay to b-quarks — count b-tagged jets.', 'nBjets', { min: 0, max: 3, def: 2, unit: '' }),
+      minCut('btags', '≥ N b-tags', 'Both tops decay to b-quarks. Tagging finds ~70% of real b-jets, so demanding 2 costs signal too.', 'nBjets', { min: 0, max: 3, def: 2, unit: '' }),
     ],
     target: 18,
   },
@@ -209,29 +209,33 @@ export const MISSIONS = [
     story:
       'Two Higgs bosons at once — one to b-quarks, one to taus — is one of the ' +
       'rarest signatures at the LHC, and directly probes how the Higgs couples ' +
-      'to itself. The signal is minuscule; tt̄ and W+jets tower over it. This is ' +
-      'the real frontier: even "evidence" (3σ) is a triumph.',
+      'to itself. The signal is minuscule, tt̄ towers over it, and nothing is ' +
+      'free: b-tagging misses real b-jets, and roughly one jet in eight fakes a ' +
+      'loose tau. Demand quality — then look for a broad m(bb) bump below ' +
+      '125 GeV (b-jets lose energy to neutrinos).',
     lesson:
-      'The rarest processes demand near-perfect object identification. Two ' +
-      'b-jets AND two taus AND missing energy together beat down enormous ' +
-      'backgrounds — but statistics are everything.',
+      'The rarest processes are won or lost on object identification. Tau ' +
+      'candidates are mostly fake jets until you require them to be isolated; ' +
+      'b-tags cost signal efficiency. Every cut is a trade-off — and tt̄ with ' +
+      'two real taus can never be fully cut away.',
     targetNote:
       '3σ is "evidence" — even the real LHC experiments have not yet reached ' +
       '5σ for Higgs-pair production.',
-    observable: { name: 'HT (scalar sum of jet pT)', feature: 'HT', unit: 'GeV', xmin: 0, xmax: 500, bins: 25, target: null },
+    observable: { name: 'm(bb) — mass of the two b-tagged jets', feature: 'mbb', unit: 'GeV', xmin: 40, xmax: 200, bins: 32, target: 125 },
     explore: [
       { name: 'HH_bbtautau', label: 'signal: HH → bbττ' },
       { name: 'ttbar_lj', label: 'background: tt̄' },
       { name: 'Wjets', label: 'background: W + jets' },
     ],
     processes: [
-      { name: 'HH_bbtautau', kind: 'signal', expected: 45 },
+      { name: 'HH_bbtautau', kind: 'signal', expected: 50 },
       { name: 'ttbar_lj', kind: 'bkg', expected: 5000 },
       { name: 'Wjets', kind: 'bkg', expected: 3500 },
     ],
     cuts: [
-      toggle('twoB', '≥ 2 b-tags', 'One Higgs → bb gives two b-jets.', (f) => f.nBjets >= 2),
-      toggle('twoTau', '≥ 2 taus', 'The other Higgs → ττ gives two taus.', (f) => f.nTaus >= 2),
+      minCut('btags', '≥ N b-tags', 'One Higgs → bb. b-tagging finds ~70% of real b-jets — and ~5% of light jets fake it.', 'nBjets', { min: 0, max: 3, def: 2, unit: '' }),
+      toggle('twoTau', '≥ 2 taus', 'The other Higgs → ττ. Beware: ~1 jet in 8 fakes a loose tau.', (f) => f.nTaus >= 2),
+      maxCut('tauIso', 'Tau ID quality (iso) <', 'Real taus are isolated; fake taus sit inside hadronic activity.', 'tauIso', { min: 0.05, max: 1, step: 0.05, def: 0.4 }),
       minCut('met', 'Missing pT >', 'Tau decays produce neutrinos → missing energy.', 'met', { min: 0, max: 80, def: 20, unit: 'GeV' }),
     ],
     target: 3,

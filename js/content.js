@@ -34,7 +34,7 @@ export const KIND_HINT = {
   photon: 'ECAL energy deposit with no matching track (neutral).',
   jet: 'A spray of many tracks with broad calorimeter energy.',
   bjet: 'A jet with a displaced secondary vertex — a long-lived b-hadron.',
-  tau: 'A narrow jet with 1 or 3 tracks.',
+  tau: 'A narrow jet with 1 or 3 tracks. Real taus are isolated; ordinary jets can fake this shape.',
   pileupTrack: 'A soft, low-pT track from a pileup collision — not the physics of interest.',
 };
 
@@ -44,7 +44,7 @@ export function idFeedback(correct, truthLabel) {
     Muon: 'It reaches the muon chambers — a muon.',
     Electron: 'Track that stops in the ECAL — an electron.',
     Photon: 'ECAL deposit with no track — a photon.',
-    Jet: 'Broad spray of tracks and calorimeter energy — a jet.',
+    Jet: 'A jet — a broad spray, or a narrow one faking a tau. Check the isolation: real taus are isolated.',
     'b-jet': 'A jet with a displaced vertex — a b-jet.',
     Tau: 'A narrow 1- or 3-track jet — a tau.',
     Pileup: 'A soft low-pT track from pileup — not signal.',

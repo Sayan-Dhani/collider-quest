@@ -89,8 +89,11 @@ events **balance in the transverse plane** (missing pT is literally minus the
 vector sum of what you see, so W events point their MET away from the muon and
 the W transverse mass ends in a genuine Jacobian edge at 80.4 GeV), the
 Drell–Yan continuum runs smoothly under the Z peak (irreducible background),
-and the cuts are the real ones: isolation, mass windows, b-tag/MET
-requirements, with Asimov significance `√(2((S+B)ln(1+S/B) − S))`.
+**object identification is imperfect** (b-tagging finds ~70% of real b-jets
+and ~5% of light jets fake it; roughly one jet in eight fakes a loose tau, so
+the HH → bbττ hunt lives or dies on tau ID quality — and plots m(bb)), and
+the cuts are the real ones: isolation, mass windows, b-tag/MET requirements,
+with Asimov significance `√(2((S+B)ln(1+S/B) − S))`.
 
 ## Test
 

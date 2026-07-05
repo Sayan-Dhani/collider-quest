@@ -305,6 +305,17 @@ main { padding: 22px; max-width: 1200px; margin: 0 auto; }
 }
 .modal-close:hover { border-color: var(--accent); }
 
+/* ---- accessibility ---- */
+.btn:focus-visible, .chip:focus-visible, .mission-card:focus-visible,
+input[type=range]:focus-visible, input[type=checkbox]:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen { animation: none; }
+  .mission-card, .btn, .sig-bar i, .energy-bar i { transition: none; }
+}
+
 /* ---- responsive ---- */
 @media (max-width: 950px) {
   .home-grid, .play-grid, .brief-grid, .lab-grid, .result-wrap, .acc-grid { grid-template-columns: 1fr; }

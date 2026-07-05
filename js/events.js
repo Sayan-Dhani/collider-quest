@@ -72,9 +72,18 @@ const mkBjet = (angle, pt) =>
 
 const mkTau = (charge, angle, pt) =>
   base('tau', 'Tau', angle, pt, {
-    charge, iso: randRange(0.05, 0.25),
+    charge, iso: randRange(0.02, 0.12), // real taus: narrow AND isolated
     ecal: pt * randRange(0.2, 0.4), hcal: pt * randRange(0.4, 0.7),
     nprong: pick([1, 1, 3]),
+  });
+
+// A light jet the tau algorithm mis-identified: narrow like a tau, but NOT
+// isolated. Its truth is 'Jet' — the tau-quality cut is what removes it.
+const mkFakeTau = (angle, pt) =>
+  base('tau', 'Jet', angle, pt, {
+    charge: pick(['+', '-']), iso: randRange(0.3, 0.8),
+    ecal: pt * randRange(0.2, 0.4), hcal: pt * randRange(0.5, 0.9),
+    nprong: pick([1, 3, 3]),
   });
 
 // A soft pileup track: dim, low-pt, not the physics you care about.
@@ -92,6 +101,29 @@ const mkFakeMuon = (angle, pt) =>
   });
 
 const opp = (c) => (c === '+' ? '-' : '+');
+
+// --- imperfect tagging -------------------------------------------------------
+// Object identification is NOT truth: a real b-jet is only tagged when the
+// displaced vertex is found, light jets sometimes fake a b-tag or a hadronic
+// tau. These round numbers are stated in the cut hints so the simplification
+// is explicit. This is what turns b-tag/tau cuts from switches into trade-offs.
+const B_TAG_EFF = 0.7;     // chance a real b-jet gets b-tagged
+const MISTAG_RATE = 0.05;  // chance a light jet fakes a b-tag
+const TAU_FAKE_RATE = 0.12; // chance a light jet passes a loose tau ID
+
+// A real b-quark jet as the detector reports it: usually b-tagged (displaced
+// vertex found), otherwise it looks like any other jet.
+const bQuarkJet = (angle, pt) =>
+  rand() < B_TAG_EFF ? mkBjet(angle, pt) : mkJet(angle, pt);
+
+// A light-quark/gluon jet as the detector reports it: usually a jet, sometimes
+// a fake b-tag, sometimes a fake hadronic tau.
+function lightJet(angle, pt) {
+  const r = rand();
+  if (r < MISTAG_RATE) return mkBjet(angle, pt);
+  if (r < MISTAG_RATE + TAU_FAKE_RATE) return mkFakeTau(angle, pt);
+  return mkJet(angle, pt);
+}
 
 // --- hard-process generators -------------------------------------------------
 // Each returns { objects, met:{magnitude,angle} }. Angles in degrees.
@@ -154,7 +186,7 @@ function addRecoilJet(objs) {
   const { px, py } = visibleSum(objs);
   const r = toPolar(-px, -py);
   if (r.magnitude < 12) return;
-  objs.push(mkJet(r.angle, r.magnitude));
+  objs.push(lightJet(r.angle, r.magnitude));
 }
 
 // Extra hadronic activity that does not fake MET: jets in back-to-back pairs.
@@ -162,8 +194,8 @@ function addBalancedJetPairs(objs, nPairs, lo = 25, hi = 60) {
   for (let i = 0; i < nPairs; i++) {
     const a = randRange(0, 360);
     const p = randRange(lo, hi);
-    objs.push(mkJet(a, p));
-    objs.push(mkJet((a + 180 + randRange(-6, 6) + 360) % 360, p * randRange(0.9, 1.1)));
+    objs.push(lightJet(a, p));
+    objs.push(lightJet((a + 180 + randRange(-6, 6) + 360) % 360, p * randRange(0.9, 1.1)));
   }
 }
 
@@ -204,7 +236,8 @@ const PROCESSES = {
   },
 
   // ttbar -> 2 leptons + 2 b-jets. The two neutrinos are the residual
-  // imbalance of the visible system -> genuine, correlated MET.
+  // imbalance of the visible system -> genuine, correlated MET. b-tagging is
+  // imperfect, so ~9% of these slip past a b-jet veto untagged.
   ttbar_2mu() {
     const [a1, a2] = twoBackToBack(70);
     const [b1, b2] = twoBackToBack(60);
@@ -212,8 +245,8 @@ const PROCESSES = {
     const objs = [
       mkMuon(c, a1, gauss(40, 12)),
       mkMuon(opp(c), a2, gauss(40, 12)),
-      mkBjet(b1, gauss(70, 20)),
-      mkBjet(b2, gauss(60, 18)),
+      bQuarkJet(b1, gauss(70, 20)),
+      bQuarkJet(b2, gauss(60, 18)),
     ];
     return { objects: objs, met: metFromBalance(objs, 8) };
   },
@@ -224,10 +257,10 @@ const PROCESSES = {
   QCD_fake() {
     const objs = [];
     const nj = randInt(3, 5);
-    for (let i = 0; i < nj - 1; i++) objs.push(mkJet(randRange(0, 360), randRange(30, 90)));
+    for (let i = 0; i < nj - 1; i++) objs.push(lightJet(randRange(0, 360), randRange(30, 90)));
     const { px, py } = visibleSum(objs);
     const close = toPolar(-px, -py);
-    objs.push(mkJet(close.angle, Math.max(25, close.magnitude)));
+    objs.push(lightJet(close.angle, Math.max(25, close.magnitude)));
     objs.push(mkFakeMuon((objs[0].angle + randRange(-12, 12) + 360) % 360, randRange(10, 30)));
     const soft = rand() < 0.2 ? 18 : 6; // 20%: badly mismeasured jet
     return { objects: objs, met: metFromBalance(objs, soft) };
@@ -277,13 +310,28 @@ const PROCESSES = {
   },
 
   // ttbar -> lepton + jets : Jacobian W muon + 2 b-jets + 2 light jets. The
-  // single neutrino (plus jet residuals) is the imbalance -> real MET.
+  // single neutrino (plus jet residuals) is the imbalance -> real MET. The W
+  // sometimes decays to a REAL tau instead of a muon (and rarely both Ws do),
+  // which is what makes ttbar the irreducible background of HH -> bbtautau.
   ttbar_lj() {
-    const objs = [wDecayMuon()];
+    const r = rand();
+    const objs = [];
+    if (r < 0.015) {
+      // both Ws -> tau nu : 2 real taus + 2 b-jets, no light jets
+      const [t1, t2] = twoBackToBack(60);
+      objs.push(mkTau(pick(['+', '-']), t1, gauss(45, 12)));
+      objs.push(mkTau(pick(['+', '-']), t2, gauss(40, 12)));
+    } else if (r < 0.15) {
+      // one W -> tau nu (hadronic tau replaces the muon)
+      objs.push(mkTau(pick(['+', '-']), randRange(0, 360), gauss(42, 12)));
+      addBalancedJetPairs(objs, 1, 35, 70);
+    } else {
+      objs.push(wDecayMuon());
+      addBalancedJetPairs(objs, 1, 35, 70);
+    }
     const [b1, b2] = twoBackToBack(60);
-    objs.push(mkBjet(b1, gauss(75, 20)));
-    objs.push(mkBjet(b2, gauss(65, 18)));
-    addBalancedJetPairs(objs, 1, 35, 70);
+    objs.push(bQuarkJet(b1, gauss(75, 20)));
+    objs.push(bQuarkJet(b2, gauss(65, 18)));
     return { objects: objs, met: metFromBalance(objs, 7) };
   },
 
@@ -291,22 +339,25 @@ const PROCESSES = {
   Wjets() {
     const objs = [wDecayMuon()];
     addBalancedJetPairs(objs, randInt(1, 2), 30, 65);
-    // occasional real b from gluon splitting
+    // occasional real b from gluon splitting (then tagged with B_TAG_EFF)
     for (let i = 0; i < objs.length; i++) {
       const o = objs[i];
-      if (o.kind === 'jet' && rand() < 0.12) objs[i] = mkBjet(o.angle, o.pt);
+      if (o.kind === 'jet' && rand() < 0.12) objs[i] = bQuarkJet(o.angle, o.pt);
     }
     return { objects: objs, met: metFromBalance(objs, 6) };
   },
 
-  // HH -> bb tautau : 2 b-jets + 2 taus. Tau decays lose neutrinos, so the
-  // residual imbalance of the visible system is genuine MET.
+  // HH -> bb tautau : one Higgs -> two b-jets whose pair mass reconstructs
+  // near (a bit below) 125 GeV, the other -> two real taus. Tau decays lose
+  // neutrinos, so the residual imbalance of the visible system is genuine MET.
   HH_bbtautau() {
     const [b1, b2] = twoBackToBack(70);
     const [t1, t2] = twoBackToBack(50);
+    // Visible m(bb) sits below 125: neutrinos in b decays + energy losses.
+    const pb = ptForMass(gauss(112, 16), b1, b2);
     const objs = [
-      mkBjet(b1, gauss(70, 18)),
-      mkBjet(b2, gauss(60, 16)),
+      bQuarkJet(b1, pb),
+      bQuarkJet(b2, pb),
       mkTau(pick(['+', '-']), t1, gauss(45, 12)),
       mkTau(pick(['+', '-']), t2, gauss(40, 12)),
     ];
@@ -371,6 +422,13 @@ export function computeFeatures(objects, met) {
     diphotonMass = pairMass(sorted[0], sorted[1], 0);
   }
 
+  // Pair mass of the two leading b-TAGGED jets (H -> bb reconstruction).
+  let mbb = null;
+  if (bjets.length >= 2) {
+    const sorted = [...bjets].sort((a, b) => b.pt - a.pt);
+    mbb = pairMass(sorted[0], sorted[1], 0);
+  }
+
   // Transverse mass of leading lepton + MET (W Jacobian).
   let mT = null;
   if (leptons.length >= 1 && met) {
@@ -396,8 +454,9 @@ export function computeFeatures(objects, met) {
     leadLeptonPt: leadPt(leptons),
     muonIso: worstIso(muons),
     photonIso: worstIsoLeading2(photons),
+    tauIso: worstIsoLeading2(taus),
     oppositeCharge: dimuonOS,
-    dimuonMass, diphotonMass, mT, HT,
+    dimuonMass, diphotonMass, mbb, mT, HT,
   };
 }
 
@@ -414,8 +473,9 @@ export function makeDisplayEvent(processName, pileupLevel = 3) {
 // --- public: weighted dataset for the Analysis Lab --------------------------
 // `mission.processes` = [{ name, kind:'signal'|'bkg', expected }]. We generate
 // `mcPerProcess` MC events per process and weight each so the summed weights
-// reproduce the expected pre-cut yields (standard MC practice).
-export function makeDataset(mission, mcPerProcess = 140) {
+// reproduce the expected pre-cut yields (standard MC practice). 250/process
+// keeps rare-tail estimates (tau fakes, mistags) reasonably smooth.
+export function makeDataset(mission, mcPerProcess = 250) {
   const events = [];
   for (const p of mission.processes) {
     const w = p.expected / mcPerProcess;

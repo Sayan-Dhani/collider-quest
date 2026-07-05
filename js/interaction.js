@@ -5,12 +5,13 @@
 import { hitTest } from './detector.js';
 import { IDENTITIES, KIND_HINT } from './content.js';
 
-// Translate a mouse event to canvas pixel coordinates, accounting for any CSS
-// scaling of the canvas element.
+// Translate a mouse event to LOGICAL canvas coordinates, accounting for CSS
+// scaling and the devicePixelRatio backing store (canvas._dpr).
 function canvasCoords(canvas, evt) {
   const rect = canvas.getBoundingClientRect();
-  const sx = canvas.width / rect.width;
-  const sy = canvas.height / rect.height;
+  const dpr = canvas._dpr || 1;
+  const sx = canvas.width / dpr / rect.width;
+  const sy = canvas.height / dpr / rect.height;
   return { x: (evt.clientX - rect.left) * sx, y: (evt.clientY - rect.top) * sy };
 }
 

@@ -136,7 +136,7 @@
           <div class="panel">
             <div class="classify-label">Which process is this event?</div>
             <div id="exp-process" class="classify-bar"></div>
-            <div id="exp-feedback" class="feedback-area"></div>
+            <div id="exp-feedback" class="feedback-area" aria-live="polite"></div>
             <button id="exp-next" class="btn btn-primary" hidden>Next event →</button>
             <div id="exp-summary" class="exp-summary" hidden>
               <p id="exp-summary-text"></p>
@@ -163,7 +163,7 @@
         <div class="lab-center">
           <div class="panel">
             <div id="metrics"></div>
-            <p id="lab-hint" class="lab-hint" hidden></p>
+            <p id="lab-hint" class="lab-hint" aria-live="polite" hidden></p>
           </div>
           <div class="panel">
             <canvas id="lab-canvas" aria-label="Stacked signal and background histogram"></canvas>
