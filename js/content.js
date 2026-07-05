@@ -65,10 +65,11 @@ export function processFeedback(correct, chosenLabel, truthLabel) {
 }
 
 // Discovery-screen headline by significance vs. the mission's own target.
-// "Discovery!" is only earned when the mission bar itself is met — a 5σ blip
-// halfway to a 12σ calibration target is not a discovery headline.
-export function resultHeadline(sig, target) {
-  if (sig >= target) return target >= 5 ? 'Discovery!' : 'Evidence secured!';
+// Rediscovery missions (Z, W, tt̄) pass their own wording via `word` — finding
+// the Z is calibration, not a "Discovery!". The generic headline is reserved
+// for genuine searches.
+export function resultHeadline(sig, target, word = null) {
+  if (sig >= target) return word ?? (target >= 5 ? 'Discovery!' : 'Evidence secured!');
   if (sig >= 3) return 'Evidence — but not yet a discovery';
   return 'Not there yet';
 }

@@ -42,7 +42,7 @@ export function evalCut(cut, features, state) {
 export const MISSIONS = [
   {
     id: 'z-mumu',
-    chapter: 'Chapter 6',
+    chapter: 'Chapter 6 · First Analysis',
     title: 'Rediscover the Z Boson',
     tagline: 'Z → μμ',
     difficulty: 'Beginner',
@@ -66,10 +66,10 @@ export const MISSIONS = [
       { name: 'QCD_fake', label: 'background: QCD fake muon' },
     ],
     processes: [
-      { name: 'Z_mumu', kind: 'signal', expected: 900 },
-      { name: 'DY_continuum', kind: 'bkg', expected: 2600 },
-      { name: 'ttbar_2mu', kind: 'bkg', expected: 700 },
-      { name: 'QCD_fake', kind: 'bkg', expected: 5200 },
+      { name: 'Z_mumu', kind: 'signal', expected: 900, label: 'Z→μμ' },
+      { name: 'DY_continuum', kind: 'bkg', expected: 2600, label: 'Drell–Yan γ*' },
+      { name: 'ttbar_2mu', kind: 'bkg', expected: 700, label: 'tt̄' },
+      { name: 'QCD_fake', kind: 'bkg', expected: 5200, label: 'QCD multijet' },
     ],
     cuts: [
       toggle('twoMu', '≥ 2 muons', 'Require at least two muon candidates.', (f) => f.nMuons >= 2),
@@ -81,12 +81,55 @@ export const MISSIONS = [
       windowCut('mass', 'Mass window |m − 91| <', 'Focus on the Z resonance.', 'dimuonMass', { center: 91.2, min: 1, max: 30, def: 25 }),
     ],
     trigger: 'doubleMuon',
+    concepts: ['invariant-mass', 'isolation', 'irreducible-bkg', 'data-vs-mc', 'ratio-panel', 'cutflow', 'rediscovery'],
+    resultWord: 'Z boson rediscovered — detector validated!',
+    // Guided-analysis steps for the Lab. A step with done(states, result,
+    // mission) auto-advances when satisfied; a step without it shows "Got it".
+    guide: [
+      {
+        title: 'The physics goal',
+        text: 'The Z decays in ~10⁻²⁵ s — you will never see one. But it decays to μ⁺μ⁻, and the muons ARE visible: combine them and the Z appears as a peak at 91 GeV. On the plot: black points are DATA (recorded collisions — nobody knows which are signal), the coloured stack is SIMULATION (MC) of the signal and each background.',
+      },
+      {
+        title: 'Your trigger already worked',
+        text: 'This dataset exists because the double-muon trigger recorded it — see the blue note above the cuts. Everything the trigger rejected is gone forever; no offline cut can bring it back.',
+      },
+      {
+        title: 'Select two opposite-charge muons',
+        text: 'A Z is neutral, so it decays to μ⁺μ⁻. Enable “≥ 2 muons” and “Opposite charge”.',
+        done: (st) => st.twoMu.enabled && st.os.enabled,
+      },
+      {
+        title: 'Demand quality muons',
+        text: 'Soft or non-isolated candidates are mostly jets faking muons. Enable the muon pT and isolation cuts — watch the QCD stack collapse in the plot.',
+        done: (st) => st.muPt.enabled && st.muIso.enabled,
+      },
+      {
+        title: 'Reject the reducible backgrounds',
+        text: 'tt̄ also gives two muons — but WITH b-jets and real missing energy: enable the b-jet veto and the missing-pT cut. What survives under the peak is non-resonant Drell–Yan: the identical final state. That background is IRREDUCIBLE — you model it, you cannot cut it.',
+        done: (st) => st.bveto.enabled && st.met.enabled,
+      },
+      {
+        title: 'Zoom in with the mass window',
+        text: 'The Z lives at 91.2 GeV. Enable the mass window and tighten it — but watch the significance: cut too deep and you throw away your own signal.',
+        done: (st) => st.mass.enabled,
+      },
+      {
+        title: 'Check Data against MC',
+        text: 'Now the real test: in the bottom RATIO panel, the black points should sit on 1, inside the grey band — the simulation describes the data. Open the cutflow to see signal, background and data survive each cut. This agreement, not the peak alone, is what validates the detector.',
+      },
+      {
+        title: 'Claim the rediscovery',
+        text: 'Collect more luminosity if needed and claim once you clear the target. For the Z this is not a discovery — it is calibration: the peak position checks the muon momentum scale, the peak width measures the resolution.',
+        done: (st, r, m) => !!r && r.significance >= m.target,
+      },
+    ],
     target: 18,
   },
 
   {
     id: 'w-munu',
-    chapter: 'Chapter 6',
+    chapter: 'Chapter 7 · Beyond the Candle',
     title: 'The W and the Invisible Neutrino',
     tagline: 'W → μν',
     difficulty: 'Beginner',
@@ -109,10 +152,10 @@ export const MISSIONS = [
       { name: 'QCD_fake', label: 'background: QCD fake muon' },
     ],
     processes: [
-      { name: 'W_munu', kind: 'signal', expected: 1400 },
-      { name: 'QCD_fake', kind: 'bkg', expected: 9000 },
-      { name: 'Z_mumu', kind: 'bkg', expected: 1600 },
-      { name: 'ttbar_lj', kind: 'bkg', expected: 900 },
+      { name: 'W_munu', kind: 'signal', expected: 1400, label: 'W→μν' },
+      { name: 'QCD_fake', kind: 'bkg', expected: 9000, label: 'QCD multijet' },
+      { name: 'Z_mumu', kind: 'bkg', expected: 1600, label: 'Z→μμ' },
+      { name: 'ttbar_lj', kind: 'bkg', expected: 900, label: 'tt̄' },
     ],
     cuts: [
       toggle('oneMu', '≥ 1 muon', 'Require a muon candidate.', (f) => f.nMuons >= 1),
@@ -123,12 +166,14 @@ export const MISSIONS = [
       toggle('bveto', 'b-jet veto', 'Suppress tt̄ background.', (f) => f.nBjets === 0),
     ],
     trigger: 'singleMuon',
+    concepts: ['met', 'jacobian-mt'],
+    resultWord: 'W boson rediscovered!',
     target: 20,
   },
 
   {
     id: 'higgs-gg',
-    chapter: 'Chapter 7',
+    chapter: 'Chapter 7 · Beyond the Candle',
     title: 'The Higgs in Two Photons',
     tagline: 'H → γγ',
     difficulty: 'Intermediate',
@@ -151,9 +196,9 @@ export const MISSIONS = [
       { name: 'gamma_jet', label: 'background: γ + jet (fake photon)' },
     ],
     processes: [
-      { name: 'H_gg', kind: 'signal', expected: 190 },
-      { name: 'gg_continuum', kind: 'bkg', expected: 6000 },
-      { name: 'gamma_jet', kind: 'bkg', expected: 4200 },
+      { name: 'H_gg', kind: 'signal', expected: 190, label: 'H→γγ' },
+      { name: 'gg_continuum', kind: 'bkg', expected: 6000, label: 'γγ continuum' },
+      { name: 'gamma_jet', kind: 'bkg', expected: 4200, label: 'γ + jet' },
     ],
     cuts: [
       toggle('twoGamma', '≥ 2 photons', 'Require two photon candidates.', (f) => f.nPhotons >= 2),
@@ -162,12 +207,13 @@ export const MISSIONS = [
       windowCut('mass', 'Mass window |m − 125| <', 'Zoom in on the Higgs region.', 'diphotonMass', { center: 125, min: 1, max: 40, def: 30 }),
     ],
     trigger: 'doublePhoton',
+    concepts: ['significance', 'five-sigma'],
     target: 5,
   },
 
   {
     id: 'top-lj',
-    chapter: 'Chapter 7',
+    chapter: 'Chapter 7 · Beyond the Candle',
     title: 'Top Quarks and b-Tagging',
     tagline: 'tt̄ → ℓ + jets',
     difficulty: 'Intermediate',
@@ -189,9 +235,9 @@ export const MISSIONS = [
       { name: 'QCD_fake', label: 'background: QCD multijet' },
     ],
     processes: [
-      { name: 'ttbar_lj', kind: 'signal', expected: 1300 },
-      { name: 'Wjets', kind: 'bkg', expected: 8000 },
-      { name: 'QCD_fake', kind: 'bkg', expected: 5000 },
+      { name: 'ttbar_lj', kind: 'signal', expected: 1300, label: 'tt̄' },
+      { name: 'Wjets', kind: 'bkg', expected: 8000, label: 'W + jets' },
+      { name: 'QCD_fake', kind: 'bkg', expected: 5000, label: 'QCD multijet' },
     ],
     cuts: [
       toggle('oneLep', '≥ 1 lepton', 'Require a lepton from the W decay.', (f) => f.nLeptons >= 1),
@@ -201,12 +247,14 @@ export const MISSIONS = [
       minCut('btags', '≥ N b-tags', 'Both tops decay to b-quarks. Tagging finds ~70% of real b-jets, so demanding 2 costs signal too.', 'nBjets', { min: 0, max: 3, def: 2, unit: '' }),
     ],
     trigger: 'singleMuon',
+    concepts: ['btag'],
+    resultWord: 'Top quarks rediscovered!',
     target: 18,
   },
 
   {
     id: 'hh-bbtautau',
-    chapter: 'Chapter 8',
+    chapter: 'Chapter 7 · Beyond the Candle',
     title: 'The Higgs-Pair Frontier',
     tagline: 'HH → bbττ',
     difficulty: 'Advanced',
@@ -232,9 +280,9 @@ export const MISSIONS = [
       { name: 'Wjets', label: 'background: W + jets' },
     ],
     processes: [
-      { name: 'HH_bbtautau', kind: 'signal', expected: 50 },
-      { name: 'ttbar_lj', kind: 'bkg', expected: 5000 },
-      { name: 'Wjets', kind: 'bkg', expected: 3500 },
+      { name: 'HH_bbtautau', kind: 'signal', expected: 50, label: 'HH→bbττ' },
+      { name: 'ttbar_lj', kind: 'bkg', expected: 5000, label: 'tt̄' },
+      { name: 'Wjets', kind: 'bkg', expected: 3500, label: 'W + jets' },
     ],
     cuts: [
       minCut('btags', '≥ N b-tags', 'One Higgs → bb. b-tagging finds ~70% of real b-jets — and ~5% of light jets fake it.', 'nBjets', { min: 0, max: 3, def: 2, unit: '' }),
@@ -243,6 +291,7 @@ export const MISSIONS = [
       minCut('met', 'Missing pT >', 'Tau decays produce neutrinos → missing energy.', 'met', { min: 0, max: 80, def: 20, unit: 'GeV' }),
     ],
     trigger: 'doubleTau',
+    concepts: ['tau-id'],
     target: 3,
   },
 

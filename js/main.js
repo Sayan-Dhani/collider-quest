@@ -3,7 +3,7 @@
 //   Home -> Accelerator -> Campaign -> Briefing -> Explorer -> Analysis Lab -> Result.
 
 import { MISSIONS, getMission } from './missions.js';
-import { makeDisplayEvent, makeDataset } from './events.js';
+import { makeDisplayEvent, makeDataset, makePseudoData, dataAtLumi } from './events.js';
 import * as detector from './detector.js';
 import * as accelerator from './accelerator.js';
 import * as chain from './chain.js';
@@ -11,12 +11,14 @@ import * as collisions from './collisions.js';
 import * as cmsSchool from './cms-school.js';
 import * as reconstruction from './reconstruction.js';
 import * as trigger from './trigger.js';
-import { renderStacked } from './histogram.js';
+import { renderDataMC } from './histogram.js';
 import { attachCanvas, renderInspector } from './interaction.js';
 import {
-  initStates, computeResult, binStacked, cutImpacts,
+  initStates, computeResult, cutImpacts, filterPassing,
+  binByProcess, binDataCounts, computeCutflow,
   renderCuts, renderCutImpacts, renderMetrics, confidenceLabel,
 } from './analysis.js';
+import { STAGES, CONCEPTS, CHAPTER_CONCEPTS } from './curriculum.js';
 import {
   TAGLINE, HOME_INTRO, CHAIN_INTRO, CHAIN_COMPLETE,
   COLLISIONS_INTRO, CMS_SCHOOL_INTRO, CMS_SCHOOL_COMPLETE,
@@ -228,39 +230,55 @@ function renderFeedback(container, fb) {
 
 // ============================ ANALYSIS LAB ==================================
 const BASE_LUMI_FB = 25; // "×1" on the slider ~ one good LHC data-taking year
+const LUMI_MAX = 4;      // slider maximum (the pseudo-data pool is drawn here)
 const lumiLabel = (l) => `${Math.round(BASE_LUMI_FB * l)} fb⁻¹`;
 
 function openLab() {
   // Every analysis runs on data recorded by ITS OWN trigger path — events the
   // trigger rejected were never written to disk and cannot appear here.
+  // `mc` is the weighted simulation (the prediction); `dataPool` is the
+  // unweighted pseudo-data, drawn once and revealed as luminosity grows.
   lab = {
-    dataset: makeDataset(mission, 250, mission.trigger),
+    mc: makeDataset(mission, 250, mission.trigger),
+    dataPool: makePseudoData(mission, mission.trigger, LUMI_MAX),
     states: initStates(mission),
     lumi: 1,
     result: null,
     impactEls: null,
+    guideStep: 0,
   };
   $('lab-title').textContent = `${mission.title} — Analysis Lab`;
   $('lumi-range').value = 1;
   $('lumi-val').textContent = lumiLabel(1);
-  const trig = lab.dataset.trigger;
+  const trig = lab.mc.trigger;
   els.labTrigger.textContent = trig
     ? `Dataset recorded by the ${trig.label.toLowerCase()} — it kept ` +
       `${Math.round(trig.sigKept * 100)}% of the signal and already rejected ` +
       `${Math.round((1 - trig.bkgKept) * 100)}% of the background before any offline cut.`
     : '';
+  els.cutflowWrap.hidden = true;
+  els.cutflowToggle.textContent = 'Show cutflow ▸';
   lab.impactEls = renderCuts(els.cutsPanel, mission, lab.states, recomputeLab);
+  renderGuide();
   recomputeLab();
   show('screen-lab');
 }
 
 function recomputeLab() {
   const prev = lab.result;
-  const r = computeResult(lab.dataset, mission, lab.states, lab.lumi);
+  const r = computeResult(lab.mc, mission, lab.states, lab.lumi);
   lab.result = r;
+  lab.data = dataAtLumi(lab.dataPool, lab.lumi);
+  lab.passingData = filterPassing(mission, lab.data, lab.states);
+
   renderMetrics(els.metrics, r, mission);
-  renderCutImpacts(lab.impactEls, cutImpacts(lab.dataset, mission, lab.states));
-  renderStacked(els.labCanvas, binStacked(r.passing, mission.observable, lab.lumi), mission.observable);
+  renderCutImpacts(lab.impactEls, cutImpacts(lab.mc, mission, lab.states));
+  renderDataMC(
+    els.labCanvas,
+    binByProcess(r.passing, mission, lab.lumi),
+    binDataCounts(lab.passingData, mission.observable),
+    mission.observable);
+  if (!els.cutflowWrap.hidden) renderCutflow();
 
   // Teachable moment: a change that LOWERED significance by costing signal.
   if (prev && r.significance < prev.significance - 0.2 && r.sigEff < prev.sigEff) {
@@ -270,6 +288,8 @@ function recomputeLab() {
   } else if (prev && r.significance >= prev.significance) {
     els.labHint.hidden = true;
   }
+
+  advanceGuide();
 
   const reached = r.significance >= mission.target;
   els.btnClaim.disabled = !reached;
@@ -282,14 +302,107 @@ function onLumiChange() {
   recomputeLab();
 }
 
+// --- cutflow table -----------------------------------------------------------
+function toggleCutflow() {
+  els.cutflowWrap.hidden = !els.cutflowWrap.hidden;
+  els.cutflowToggle.textContent = els.cutflowWrap.hidden ? 'Show cutflow ▸' : 'Hide cutflow ▾';
+  if (!els.cutflowWrap.hidden) renderCutflow();
+}
+
+function renderCutflow() {
+  const rows = computeCutflow(lab.mc, lab.data, mission, lab.states, lab.lumi);
+  let html =
+    '<table class="cutflow-table"><thead><tr>' +
+    '<th>Selection stage</th><th>Signal (MC)</th><th>Background (MC)</th><th>Data</th></tr></thead><tbody>';
+  for (const row of rows) {
+    html += `<tr><td>${row.label}</td><td>${Math.round(row.S)}</td>` +
+      `<td>${Math.round(row.B)}</td><td>${row.nData}</td></tr>`;
+  }
+  html += '</tbody></table>' +
+    '<p class="muted small">Expected signal and background come from simulation; ' +
+    'the Data column is what was actually counted. They should track each other.</p>';
+  els.cutflowWrap.innerHTML = html;
+}
+
+// --- guided analysis (mission.guide) ------------------------------------------
+function renderGuide() {
+  const g = mission.guide;
+  if (!g || lab.guideStep >= g.length) {
+    els.labGuide.hidden = true;
+    return;
+  }
+  const step = g[lab.guideStep];
+  els.labGuide.hidden = false;
+  els.labGuide.innerHTML = '';
+
+  const head = document.createElement('div');
+  head.className = 'guide-head';
+  const tag = document.createElement('span');
+  tag.className = 'guide-tag';
+  tag.textContent = `Guided analysis · step ${lab.guideStep + 1}/${g.length}`;
+  const skip = document.createElement('button');
+  skip.className = 'btn btn-ghost small';
+  skip.textContent = 'skip guide ✕';
+  skip.addEventListener('click', () => { lab.guideStep = g.length; renderGuide(); });
+  head.appendChild(tag);
+  head.appendChild(skip);
+  els.labGuide.appendChild(head);
+
+  const title = document.createElement('b');
+  title.textContent = step.title;
+  els.labGuide.appendChild(title);
+  const body = document.createElement('p');
+  body.textContent = step.text;
+  els.labGuide.appendChild(body);
+
+  if (step.done) {
+    const wait = document.createElement('p');
+    wait.className = 'muted small guide-wait';
+    wait.textContent = '… waiting for you to do it';
+    els.labGuide.appendChild(wait);
+  } else {
+    const next = document.createElement('button');
+    next.className = 'btn btn-primary small';
+    next.textContent = 'Got it →';
+    next.addEventListener('click', () => { lab.guideStep++; renderGuide(); });
+    els.labGuide.appendChild(next);
+  }
+}
+
+function advanceGuide() {
+  const g = mission.guide;
+  if (!g || lab.guideStep >= g.length) return;
+  const step = g[lab.guideStep];
+  if (step.done && step.done(lab.states, lab.result, mission)) {
+    lab.guideStep++;
+    renderGuide();
+  }
+}
+
+// ============================ CONCEPT CARDS =================================
+function unlockConcepts(ids) {
+  const fresh = [];
+  for (const id of ids || []) {
+    if (!CONCEPTS[id]) continue;
+    const key = 'concept-' + id;
+    if (!progress.has(key)) { progress.add(key); fresh.push(id); }
+  }
+  if (fresh.length) saveProgress();
+  return fresh;
+}
+
+const conceptsUnlockedCount = () =>
+  Object.keys(CONCEPTS).filter((id) => progress.has('concept-' + id)).length;
+
 // ============================ RESULT ========================================
 function claimDiscovery() {
   const r = lab.result;
   const wasNew = !progress.has(mission.id);
   progress.add(mission.id);
   saveProgress();
+  const freshConcepts = unlockConcepts(mission.concepts);
 
-  $('result-headline').textContent = resultHeadline(r.significance, mission.target);
+  $('result-headline').textContent = resultHeadline(r.significance, mission.target, mission.resultWord);
   const conf = confidenceLabel(r.significance);
   const nCuts = mission.cuts.filter((c) => lab.states[c.id].enabled).length;
   const rows = [
@@ -309,7 +422,28 @@ function claimDiscovery() {
     els.resultStats.appendChild(row);
   }
   els.resultClosing.textContent = CLOSING;
-  renderStacked(els.resultCanvas, binStacked(r.passing, mission.observable, lab.lumi), mission.observable);
+  renderDataMC(
+    els.resultCanvas,
+    binByProcess(r.passing, mission, lab.lumi),
+    binDataCounts(lab.passingData, mission.observable),
+    mission.observable);
+
+  // Concept cards collected by this analysis.
+  els.resultConcepts.innerHTML = '';
+  const showIds = (mission.concepts || []).filter((id) => CONCEPTS[id]);
+  if (showIds.length) {
+    const label = document.createElement('span');
+    label.className = 'muted small';
+    label.textContent = 'Concept cards collected:';
+    els.resultConcepts.appendChild(label);
+    for (const id of showIds) {
+      const chip = document.createElement('button');
+      chip.className = 'chip concept-chip' + (freshConcepts.includes(id) ? ' concept-new' : '');
+      chip.textContent = (freshConcepts.includes(id) ? '✦ ' : '') + CONCEPTS[id].title;
+      chip.addEventListener('click', openConcepts);
+      els.resultConcepts.appendChild(chip);
+    }
+  }
 
   // Offer next mission if it just unlocked.
   const idx = MISSIONS.findIndex((m) => m.id === mission.id);
@@ -343,6 +477,7 @@ function enterLHC() {
 function chapterDone(key) {
   progress.add(key);
   saveProgress();
+  unlockConcepts(CHAPTER_CONCEPTS[key]);
   enterLHC();
 }
 
@@ -481,6 +616,39 @@ function showExperimentInfo(id) {
 function openDetectorModal() { els.detectorModal.hidden = false; }
 function closeDetectorModal() { els.detectorModal.hidden = true; }
 
+// ============================ CONCEPTS GLOSSARY =============================
+// Every card is readable at any time ("explain like I'm new"); the ones the
+// player has earned through play are marked as collected.
+function openConcepts() {
+  const list = $('concepts-list');
+  list.innerHTML = '';
+  for (const [id, c] of Object.entries(CONCEPTS)) {
+    const got = progress.has('concept-' + id);
+    const card = document.createElement('div');
+    card.className = 'concept-card' + (got ? ' concept-got' : '');
+    card.innerHTML =
+      `<div class="concept-title"><b>${c.title}</b>` +
+      `<span class="concept-state">${got ? '✦ collected' : 'not yet collected'}</span></div>` +
+      `<p>${c.text}</p>`;
+    list.appendChild(card);
+  }
+  $('concepts-note').textContent =
+    `${conceptsUnlockedCount()} / ${Object.keys(CONCEPTS).length} concept cards collected — play chapters and missions to collect the rest.`;
+  els.conceptsModal.hidden = false;
+}
+function closeConcepts() { els.conceptsModal.hidden = true; }
+
+// ============================ LEARNING MAP ==================================
+// "You are here" in the experimental chain, shown on chapter/campaign screens.
+function renderLearningMaps() {
+  for (const el of document.querySelectorAll('.learn-map')) {
+    const active = el.getAttribute('data-stage');
+    el.innerHTML = STAGES.map((s) =>
+      `<span class="lm-stage${s.id === active ? ' lm-here' : ''}">${s.label}</span>`
+    ).join('<span class="lm-arrow">→</span>');
+  }
+}
+
 // ============================ INIT ==========================================
 // Hi-DPI: back the canvas with devicePixelRatio× pixels (capped at 2) and let
 // the renderers scale the context once per frame, so drawing, hit-testing and
@@ -512,6 +680,11 @@ function init() {
     metrics: $('metrics'),
     labHint: $('lab-hint'),
     labTrigger: $('lab-trigger'),
+    labGuide: $('lab-guide'),
+    cutflowToggle: $('cutflow-toggle'),
+    cutflowWrap: $('cutflow-wrap'),
+    resultConcepts: $('result-concepts'),
+    conceptsModal: $('concepts-modal'),
     chapterRow: $('chapter-row'),
     labCanvas: $('lab-canvas'),
     btnClaim: $('btn-claim'),
@@ -539,8 +712,8 @@ function init() {
   sizeCanvas(els.chainCanvas, 700, 160);
   sizeCanvas(els.cmsCanvas, 240, 240);
   sizeCanvas(els.detectorCanvas, 560, 560);
-  sizeCanvas(els.labCanvas, 560, 300);
-  sizeCanvas(els.resultCanvas, 520, 300);
+  sizeCanvas(els.labCanvas, 560, 400);   // main panel + Data/MC ratio panel
+  sizeCanvas(els.resultCanvas, 520, 380);
 
   $('tagline').textContent = TAGLINE;
   $('home-intro').textContent = HOME_INTRO;
@@ -571,9 +744,16 @@ function init() {
   for (const el of document.querySelectorAll('[data-close-modal]')) {
     el.addEventListener('click', closeDetectorModal);
   }
+  // Concepts glossary (topbar).
+  $('concepts-btn').addEventListener('click', openConcepts);
+  for (const el of document.querySelectorAll('[data-close-concepts]')) {
+    el.addEventListener('click', closeConcepts);
+  }
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeDetectorModal();
+    if (e.key === 'Escape') { closeDetectorModal(); closeConcepts(); }
   });
+  $('cutflow-toggle').addEventListener('click', toggleCutflow);
+  renderLearningMaps();
 
   $('btn-explorer').addEventListener('click', openExplorer);
   $('btn-skip-lab').addEventListener('click', openLab);

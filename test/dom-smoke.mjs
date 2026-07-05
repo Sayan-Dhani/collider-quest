@@ -148,6 +148,22 @@ step('summary hand-off -> analysis lab', () => getEl('exp-summary-lab').click())
 step('lab shows trigger provenance', () => {
   if (!/trigger/i.test(getEl('lab-trigger').textContent)) throw new Error('lab trigger line empty');
 });
+step('guided analysis box rendered (Z mission)', () => {
+  const g = getEl('lab-guide');
+  if (g.hidden !== false || !g._children.length) throw new Error('guide not rendered');
+});
+step('cutflow toggles open with a table', () => {
+  getEl('cutflow-toggle').click();
+  const w = getEl('cutflow-wrap');
+  if (w.hidden !== false || !/cutflow-table/.test(w.innerHTML)) throw new Error('cutflow missing');
+});
+step('concepts glossary opens with cards', () => {
+  getEl('concepts-btn').click();
+  if (getEl('concepts-modal').hidden !== false) throw new Error('glossary did not open');
+  if (getEl('concepts-list')._children.length < 15) throw new Error('too few concept cards');
+  docL.keydown({ key: 'Escape' });
+  if (getEl('concepts-modal').hidden !== true) throw new Error('glossary did not close');
+});
 step('toggle every cut on', () => {
   const panel = getEl('cuts-panel');
   // cut checkboxes are the first input in each cut-row; dispatch change=checked
@@ -158,6 +174,13 @@ step('toggle every cut on', () => {
 });
 step('raise luminosity', () => { const r = getEl('lumi-range'); r.value = '4'; r.dispatch('input', {}); });
 step('claim discovery', () => { const b = getEl('btn-claim'); b.dispatch('click', {}); });
+step('result shows collected concept cards', () => {
+  if (!getEl('result-concepts')._children.length) throw new Error('no concept chips on result');
+});
+step('rediscovery wording on result headline', () => {
+  const h = getEl('result-headline').textContent;
+  if (!/rediscovered/i.test(h)) throw new Error(`expected rediscovery headline, got "${h}"`);
+});
 step('progress saved', () => { if (!global.localStorage.getItem('cq_progress_v2')) throw new Error('progress not saved'); });
 
 console.log(errors === 0 ? '\nDOM SMOKE: ALL PASS' : `\nDOM SMOKE: ${errors} FAILURES`);

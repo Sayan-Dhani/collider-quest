@@ -13,7 +13,7 @@
 import {
   Z_MASS, W_MASS, HIGGS_MASS, MUON_MASS,
   pairMass, fourMomentum, invariantMass,
-  rand, randRange, randInt, pick, gauss, degToRad,
+  rand, randRange, randInt, pick, gauss, degToRad, poisson,
 } from './physics.js';
 import { TRIGGERS } from './trigger.js'; // pure definitions, no DOM at import
 
@@ -505,6 +505,7 @@ export function makeDataset(mission, mcPerProcess = 250, triggerId = null) {
       if (isSignal) sigRec += w; else bkgRec += w;
 
       events.push({
+        sampleType: 'mc',
         processName: p.name,
         truth: isSignal ? 'signal' : 'bkg',
         weight: w,
@@ -520,6 +521,52 @@ export function makeDataset(mission, mcPerProcess = 250, triggerId = null) {
         bkgKept: bkgAll > 0 ? bkgRec / bkgAll : 1 }
     : null;
   return events;
+}
+
+// --- public: pseudo-DATA for the Analysis Lab --------------------------------
+// "Data" are what the detector actually recorded: unweighted events (one per
+// collision), Poisson-fluctuated around the expectation, recorded through the
+// trigger. The player's UI never shows their truth — analysts do not know
+// which data events are signal. The pool is drawn ONCE at the maximum
+// luminosity; the lumi slider then reveals the first fraction of each
+// process's events (thinning a Poisson sample is again Poisson, and collected
+// data only ever grows — it never re-rolls).
+export function makePseudoData(mission, triggerId = null, lumiMax = 4) {
+  const trig = triggerId ? TRIGGERS.find((t) => t.id === triggerId) : null;
+  const byProcess = [];
+  for (const p of mission.processes) {
+    const n = poisson(p.expected * lumiMax);
+    const evs = [];
+    const isSignal = p.kind === 'signal';
+    for (let i = 0; i < n; i++) {
+      const { objects, met } = PROCESSES[p.name]();
+      addPileup(objects, 1);
+      const features = computeFeatures(objects, met);
+      if (trig && !trig.test(features)) continue; // never recorded
+      evs.push({
+        sampleType: 'data',
+        weight: 1,
+        features,
+        observable: features[mission.observable.feature] ?? null,
+        // truth is kept for the node tests only; the UI must never show it
+        processName: p.name,
+        truth: isSignal ? 'signal' : 'bkg',
+      });
+    }
+    byProcess.push(evs);
+  }
+  return { byProcess, lumiMax };
+}
+
+// The data collected so far at `lumi` (out of the pool's lumiMax).
+export function dataAtLumi(pool, lumi) {
+  const frac = Math.max(0, Math.min(1, lumi / pool.lumiMax));
+  const out = [];
+  for (const evs of pool.byProcess) {
+    const n = Math.round(evs.length * frac);
+    for (let i = 0; i < n; i++) out.push(evs[i]);
+  }
+  return out;
 }
 
 // --- raw detector hits -------------------------------------------------------

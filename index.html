@@ -11,6 +11,7 @@
   <header class="topbar">
     <div class="brand"><span class="logo">◎</span><span>Collider Quest</span></div>
     <div class="tagline" id="tagline"></div>
+    <button id="concepts-btn" class="btn btn-ghost small">📖 Concepts</button>
   </header>
 
   <main>
@@ -40,6 +41,7 @@
         <h1>Build the Beam</h1>
         <span class="muted">Chapter 1</span>
       </div>
+      <div class="learn-map" data-stage="accelerator"></div>
       <p class="muted chain-intro" id="chain-intro"></p>
       <div class="chain-grid">
         <div class="panel chain-canvas-wrap">
@@ -56,6 +58,7 @@
         <h1>First Collisions</h1>
         <span class="muted">Chapter 2</span>
       </div>
+      <div class="learn-map" data-stage="collisions"></div>
       <p class="muted" id="collisions-intro"></p>
       <div id="collisions-content" class="panel"></div>
     </section>
@@ -67,6 +70,7 @@
         <h1>Inside CMS</h1>
         <span class="muted">Chapter 3</span>
       </div>
+      <div class="learn-map" data-stage="detector"></div>
       <p class="muted" id="cms-school-intro"></p>
       <div class="cms-school-grid">
         <div class="panel cms-cutaway-wrap">
@@ -83,6 +87,7 @@
         <h1>From Hits to Physics Objects</h1>
         <span class="muted">Chapter 4</span>
       </div>
+      <div class="learn-map" data-stage="reconstruction"></div>
       <p class="muted" id="reconstruction-intro"></p>
       <div id="reconstruction-content" class="panel"></div>
     </section>
@@ -94,6 +99,7 @@
         <h1>Trigger the Data</h1>
         <span class="muted">Chapter 5</span>
       </div>
+      <div class="learn-map" data-stage="trigger"></div>
       <p class="muted" id="trigger-intro"></p>
       <div id="trigger-content" class="panel"></div>
     </section>
@@ -143,6 +149,7 @@
         <h1>Campaign</h1>
         <span class="muted" id="progress-note"></span>
       </div>
+      <div class="learn-map" data-stage="analysis"></div>
       <div id="chapter-row" class="chapter-row"></div>
       <div id="mission-grid" class="mission-grid"></div>
     </section>
@@ -226,12 +233,15 @@
           <h3 class="panel-title">Selection cuts</h3>
           <p class="muted small">Enable criteria and drag the thresholds. Watch signal rise and background fall.</p>
           <p id="lab-trigger" class="muted small lab-trigger"></p>
+          <div id="lab-guide" class="lab-guide" aria-live="polite" hidden></div>
           <div id="cuts-panel"></div>
         </div>
         <div class="lab-center">
           <div class="panel">
             <div id="metrics"></div>
             <p id="lab-hint" class="lab-hint" aria-live="polite" hidden></p>
+            <button id="cutflow-toggle" class="btn btn-ghost small cutflow-btn">Show cutflow ▸</button>
+            <div id="cutflow-wrap" class="cutflow-wrap" hidden></div>
           </div>
           <div class="panel">
             <canvas id="lab-canvas" aria-label="Stacked signal and background histogram"></canvas>
@@ -252,6 +262,7 @@
         <div class="panel">
           <h1 id="result-headline">Result</h1>
           <div id="result-stats" class="summary-stats"></div>
+          <div id="result-concepts" class="concept-row"></div>
           <p id="result-closing" class="closing"></p>
           <div class="brief-actions">
             <button id="result-next" class="btn btn-primary" hidden>Next mission →</button>
@@ -284,6 +295,17 @@
         14,000 tonnes, 15 m across — and a person for scale.
       </p>
       <p class="muted small">Image: CERN / CMS Collaboration.</p>
+    </div>
+  </div>
+
+  <!-- ===================== CONCEPTS GLOSSARY MODAL ===================== -->
+  <div id="concepts-modal" class="modal" hidden>
+    <div class="modal-backdrop" data-close-concepts></div>
+    <div class="modal-box" role="dialog" aria-label="Concept cards glossary">
+      <button class="modal-close" data-close-concepts aria-label="Close">✕</button>
+      <h2>Concept cards</h2>
+      <p class="muted small" id="concepts-note"></p>
+      <div id="concepts-list" class="concepts-list"></div>
     </div>
   </div>
 

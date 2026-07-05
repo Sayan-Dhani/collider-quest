@@ -21,6 +21,11 @@ function passesAll(mission, features, states) {
   return true;
 }
 
+// Events (data or MC) passing every enabled cut.
+export function filterPassing(mission, events, states) {
+  return events.filter((ev) => passesAll(mission, ev.features, states));
+}
+
 // Core computation: signal/background yields before and after cuts, efficiencies
 // and Asimov significance. `lumi` scales the expected yields (more integrated
 // luminosity = more events = higher significance, ~sqrt(lumi)). Returns the
@@ -29,6 +34,7 @@ export function computeResult(dataset, mission, states, lumi = 1) {
   let S = 0, B = 0, Stot = 0, Btot = 0;
   const passing = [];
   for (const ev of dataset) {
+    if (ev.sampleType === 'data') continue; // prediction is built from MC only
     if (ev.truth === 'signal') Stot += ev.weight; else Btot += ev.weight;
     if (passesAll(mission, ev.features, states)) {
       if (ev.truth === 'signal') S += ev.weight; else B += ev.weight;
@@ -61,6 +67,82 @@ export function binStacked(passing, observable, lumi = 1) {
   return { sig, bkg, xmin, xmax, bins };
 }
 
+// --- Data/MC binning ----------------------------------------------------------
+
+// Bin the passing MC events per PROCESS (stacked in mission order, signal
+// last so it sits on top), with a per-bin prediction uncertainty:
+// MC statistics ⊕ a flat normalization systematic.
+const NORM_SYST = 0.08; // 8% normalization uncertainty on the MC prediction
+export function binByProcess(passingMC, mission, lumi = 1) {
+  const { xmin, xmax, bins } = mission.observable;
+  const w = (xmax - xmin) / bins;
+  const order = [...mission.processes].sort((a, b) =>
+    (a.kind === 'signal' ? 1 : 0) - (b.kind === 'signal' ? 1 : 0));
+  const procs = order.map((p) => ({
+    name: p.name, label: p.label ?? p.name, kind: p.kind, bins: new Array(bins).fill(0),
+  }));
+  const idx = new Map(procs.map((p, i) => [p.name, i]));
+  const total = new Array(bins).fill(0);
+  const w2 = new Array(bins).fill(0); // Σ weight² for MC statistical error
+  for (const ev of passingMC) {
+    const v = ev.observable;
+    if (v == null || v < xmin || v >= xmax) continue;
+    const b = Math.floor((v - xmin) / w);
+    const wt = ev.weight * lumi;
+    procs[idx.get(ev.processName)].bins[b] += wt;
+    total[b] += wt;
+    w2[b] += wt * wt;
+  }
+  const err = total.map((t, i) => Math.sqrt(w2[i] + (NORM_SYST * t) ** 2));
+  return { procs, total, err, xmin, xmax, bins };
+}
+
+// Bin passing DATA events: integer counts, error = sqrt(N).
+export function binDataCounts(passingData, observable) {
+  const { xmin, xmax, bins } = observable;
+  const w = (xmax - xmin) / bins;
+  const counts = new Array(bins).fill(0);
+  for (const ev of passingData) {
+    const v = ev.observable;
+    if (v == null || v < xmin || v >= xmax) continue;
+    counts[Math.floor((v - xmin) / w)]++;
+  }
+  return counts;
+}
+
+// --- cutflow -------------------------------------------------------------------
+
+// Sequential cutflow: starting from everything recorded by the trigger, apply
+// the ENABLED cuts one after another (in the mission's listed order) and count
+// expected signal, expected background, and observed data at each stage.
+export function computeCutflow(mcEvents, dataEvents, mission, states, lumi = 1) {
+  const active = [];
+  const rows = [];
+  const count = () => {
+    let S = 0, B = 0, nData = 0;
+    for (const ev of mcEvents) {
+      if (ev.sampleType === 'data') continue;
+      let pass = true;
+      for (const c of active) if (!evalCut(c, ev.features, states[c.id])) { pass = false; break; }
+      if (!pass) continue;
+      if (ev.truth === 'signal') S += ev.weight * lumi; else B += ev.weight * lumi;
+    }
+    for (const ev of dataEvents) {
+      let pass = true;
+      for (const c of active) if (!evalCut(c, ev.features, states[c.id])) { pass = false; break; }
+      if (pass) nData++;
+    }
+    return { S, B, nData };
+  };
+  rows.push({ label: 'Recorded by trigger', ...count() });
+  for (const cut of mission.cuts) {
+    if (!states[cut.id].enabled) continue;
+    active.push(cut);
+    rows.push({ label: cut.label, ...count() });
+  }
+  return rows;
+}
+
 // Marginal (N-1) impact of each ENABLED cut: of the signal/background that
 // passes all the OTHER enabled cuts, what fraction does this cut remove?
 // This is how analysts judge which selection is doing the work.
@@ -69,6 +151,7 @@ export function cutImpacts(dataset, mission, states) {
   const acc = {};
   for (const c of enabled) acc[c.id] = { sAll: 0, bAll: 0, sCut: 0, bCut: 0 };
   for (const ev of dataset) {
+    if (ev.sampleType === 'data') continue;
     const passes = enabled.map((c) => evalCut(c, ev.features, states[c.id]));
     const nFail = passes.reduce((n, p) => n + (p ? 0 : 1), 0);
     if (nFail > 1) continue; // fails 2+ cuts: contributes to no N-1 sample

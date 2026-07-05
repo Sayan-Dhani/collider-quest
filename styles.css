@@ -324,6 +324,54 @@ main { padding: 22px; max-width: 1200px; margin: 0 auto; }
 /* ---- trigger card requirement line ---- */
 .trigger-req { color: var(--accent); margin: 2px 0 6px; }
 
+/* ---- learning map ("you are here" in the experimental chain) ---- */
+.learn-map {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin: 0 0 14px; font-size: 12px; color: var(--muted);
+}
+.lm-stage { padding: 3px 9px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); }
+.lm-here { color: #05221b; background: var(--accent-2); border-color: var(--accent-2); font-weight: 700; }
+.lm-arrow { color: var(--line); }
+
+/* ---- guided analysis box (Lab) ---- */
+.lab-guide {
+  margin: 0 0 12px; padding: 12px;
+  background: rgba(0, 255, 198, 0.06); border: 1px solid rgba(0, 255, 198, 0.35);
+  border-radius: 10px; font-size: 14px;
+}
+.lab-guide p { margin: 6px 0 8px; line-height: 1.5; }
+.guide-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.guide-tag { color: var(--accent-2); font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
+.guide-wait { font-style: italic; }
+
+/* ---- cutflow table ---- */
+.cutflow-btn { margin-top: 10px; }
+.cutflow-wrap { margin-top: 8px; overflow-x: auto; }
+.cutflow-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cutflow-table th, .cutflow-table td {
+  padding: 5px 9px; text-align: right; border-bottom: 1px solid var(--line);
+}
+.cutflow-table th:first-child, .cutflow-table td:first-child { text-align: left; }
+.cutflow-table th { color: var(--muted); font-weight: 600; font-size: 12px; }
+.cutflow-table td:nth-child(2) { color: var(--accent); }
+.cutflow-table td:last-child { color: var(--text); font-weight: 600; }
+
+/* ---- concept cards ---- */
+.concept-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 0; }
+.concept-chip { font-size: 12px; }
+.concept-new { border-color: var(--accent-2); color: var(--accent-2); }
+.concepts-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; margin-top: 12px; }
+.concept-card {
+  padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02); opacity: 0.75;
+}
+.concept-card.concept-got { opacity: 1; border-color: rgba(0, 255, 198, 0.4); }
+.concept-title { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.concept-state { font-size: 11px; color: var(--muted); flex: 0 0 auto; }
+.concept-got .concept-state { color: var(--accent-2); }
+.concept-card p { margin: 6px 0 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.concept-got p { color: var(--text); }
+
 /* ---- accessibility ---- */
 .btn:focus-visible, .chip:focus-visible, .mission-card:focus-visible,
 input[type=range]:focus-visible, input[type=checkbox]:focus-visible {

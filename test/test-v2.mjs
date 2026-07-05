@@ -226,6 +226,105 @@ for (const m of MISSIONS) {
     `photon raw hits: ${hp.ecalCells.length} ECAL cells, no muon hits`);
 }
 
+// 9e. PSEUDO-DATA: unweighted Poisson-fluctuated events, recorded through the
+// trigger, revealed progressively by luminosity, truth never used by the UI.
+{
+  const { makePseudoData, dataAtLumi } = await import(`${R}/events.js`);
+  const { getTrigger } = await import(`${R}/trigger.js`);
+  const m = getMission('z-mumu');
+  const pool = makePseudoData(m, m.trigger, 4);
+  const all = dataAtLumi(pool, 4);
+  const half = dataAtLumi(pool, 2);
+  ok(all.every(ev => ev.sampleType === 'data' && ev.weight === 1),
+    `pseudo-data: ${all.length} unweighted events (weight = 1)`);
+  const trig = getTrigger(m.trigger);
+  ok(all.every(ev => trig.test(ev.features)), 'pseudo-data: every event passed the trigger');
+  // Count matches the trigger-filtered expectation (per-process keep rates
+  // measured from MC) within Poisson + MC-statistics tolerance.
+  const mc = makeDataset(m, 400, m.trigger);
+  let expRec = 0;
+  for (const p of m.processes) {
+    const keep = mc.filter(ev => ev.processName === p.name).length / 400;
+    expRec += p.expected * 4 * keep;
+  }
+  ok(Math.abs(all.length - expRec) < 0.08 * expRec,
+    `pseudo-data count ${all.length} ~ expected ${expRec.toFixed(0)} (within 8%)`);
+  ok(Math.abs(half.length - all.length / 2) < all.length * 0.02,
+    `half the luminosity reveals ~half the data (${half.length} vs ${all.length})`);
+  // computeResult must ignore data entirely (prediction is MC-only).
+  const mixed = [...mc, ...all];
+  const rMixed = computeResult(mixed, m, initStates(m));
+  const rMC = computeResult(mc, m, initStates(m));
+  ok(Math.abs(rMixed.S - rMC.S) < 1e-9 && Math.abs(rMixed.B - rMC.B) < 1e-9,
+    'computeResult ignores data events (prediction is MC-only)');
+}
+
+// 9f. Data/MC binning + cutflow consistency.
+{
+  const { makePseudoData, dataAtLumi } = await import(`${R}/events.js`);
+  const { binByProcess, binDataCounts, computeCutflow, filterPassing } = await import(`${R}/analysis.js`);
+  const m = getMission('z-mumu');
+  const mc = makeDataset(m, 400, m.trigger);
+  const pool = makePseudoData(m, m.trigger, 4);
+  const data = dataAtLumi(pool, 2);
+  const states = goodStates(m);
+  const r = computeResult(mc, m, states, 2);
+
+  // Per-process stack totals equal the summed prediction; signal stacked last.
+  const stack = binByProcess(r.passing, m, 2);
+  const stackSum = stack.total.reduce((a, b) => a + b, 0);
+  const procSum = stack.procs.reduce((a, p) => a + p.bins.reduce((x, y) => x + y, 0), 0);
+  ok(Math.abs(stackSum - procSum) < 1e-6, 'binByProcess: process bins sum to the total');
+  ok(stack.procs[stack.procs.length - 1].kind === 'signal', 'binByProcess: signal is stacked on top');
+  ok(stack.err.every((e, i) => e >= 0 && (stack.total[i] === 0 || e > 0)),
+    'binByProcess: prediction uncertainty present per filled bin');
+
+  // Data bins: integer counts that sum to the passing data.
+  const passData = filterPassing(m, data, states);
+  const dbins = binDataCounts(passData, m.observable);
+  const inRange = passData.filter(ev =>
+    ev.observable != null && ev.observable >= m.observable.xmin && ev.observable < m.observable.xmax).length;
+  ok(dbins.reduce((a, b) => a + b, 0) === inRange, `binDataCounts sums to ${inRange} in-range data events`);
+
+  // Cutflow: monotone non-increasing, starts at totals, ends at the result.
+  const rows = computeCutflow(mc, data, m, states, 2);
+  ok(rows.length === 1 + m.cuts.length, `cutflow has ${rows.length} rows (trigger + ${m.cuts.length} cuts)`);
+  let mono = true;
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i].S > rows[i - 1].S + 1e-9 || rows[i].B > rows[i - 1].B + 1e-9 || rows[i].nData > rows[i - 1].nData) mono = false;
+  }
+  ok(mono, 'cutflow is monotone non-increasing in S, B and data');
+  const last = rows[rows.length - 1];
+  ok(Math.abs(last.S - r.S) < 1e-6 && Math.abs(last.B - r.B) < 1e-6 && last.nData === passData.length,
+    `cutflow final row matches computeResult (S=${last.S.toFixed(0)}, B=${last.B.toFixed(0)}, data=${last.nData})`);
+}
+
+// 9g. Curriculum layer + guided Z analysis + rediscovery wording.
+{
+  const cur = await import(`${R}/curriculum.js`);
+  const { resultHeadline } = await import(`${R}/content.js`);
+  ok(cur.STAGES.length === 7 && cur.STAGES[0].id === 'accelerator' && cur.STAGES[6].id === 'statistics',
+    'learning map: 7 stages from accelerator to statistics');
+  ok(Object.keys(cur.CONCEPTS).length >= 16, `${Object.keys(cur.CONCEPTS).length} concept cards defined`);
+  for (const [ch, ids] of Object.entries(cur.CHAPTER_CONCEPTS)) {
+    ok(ids.every(id => cur.CONCEPTS[id]), `${ch} unlocks valid concepts (${ids.join(', ')})`);
+  }
+  for (const m of MISSIONS) {
+    if (!m.concepts) continue;
+    ok(m.concepts.every(id => cur.CONCEPTS[id]), `${m.id} concepts all defined`);
+  }
+  const z = getMission('z-mumu');
+  ok(Array.isArray(z.guide) && z.guide.length >= 8, `Z guided analysis has ${z.guide.length} steps`);
+  const st = initStates(z);
+  ok(z.guide.filter(s => s.done).every(s => s.done(st, { significance: 0 }, z) === false),
+    'Z guide predicates start unsatisfied');
+  st.twoMu.enabled = true; st.os.enabled = true;
+  ok(z.guide[2].done(st, null, z) === true, 'Z guide step 3 completes when muon cuts are enabled');
+  ok(resultHeadline(30, 18, z.resultWord) === z.resultWord,
+    `rediscovery wording: "${z.resultWord}"`);
+  ok(resultHeadline(6, 5) === 'Discovery!', 'searches still headline "Discovery!"');
+}
+
 // 10. binStacked buckets weighted signal correctly.
 {
   const m = getMission('z-mumu');

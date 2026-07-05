@@ -95,6 +95,17 @@ export function significance(S, B) {
   return Math.sqrt(Math.max(0, z2));
 }
 
+// Poisson sample: Knuth's method for small means, Gaussian approximation for
+// large ones. Used to fluctuate pseudo-data counts around the expectation.
+export function poisson(mean) {
+  if (mean <= 0) return 0;
+  if (mean > 50) return Math.max(0, Math.round(gauss(mean, Math.sqrt(mean))));
+  const L = Math.exp(-mean);
+  let k = 0, p = 1;
+  do { k++; p *= rand(); } while (p > L);
+  return k - 1;
+}
+
 // Uniform random float in [min, max).
 export function randRange(min, max) {
   return min + rand() * (max - min);

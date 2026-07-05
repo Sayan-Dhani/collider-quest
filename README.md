@@ -51,22 +51,29 @@ on a fork: enable **Settings → Pages → Source: GitHub Actions**, then push.
    LHCb on the other axis. Watch the beams ramp to 6.8 TeV and the collisions
    flash. Click an experiment to learn about it; click **CMS** to start
    analysing its collisions.
-2. Pick a mission from the campaign.
-3. Read the **briefing** (story + the physics you're about to do).
-4. **Event Explorer** — real events are messy: several processes plus pileup
+3. Pick a mission from the campaign.
+4. Read the **briefing** (story + the physics you're about to do).
+5. **Event Explorer** — real events are messy: several processes plus pileup
    overlap in one display. Click objects to inspect their detector signals
    (track? reaches the muon chambers? isolated? displaced vertex?), identify
    them, and guess which process produced the event.
-5. **Analysis Lab** — the heart of the game. You get a whole dataset (a little
-   signal buried in a lot of background). Enable **selection cuts** and drag
-   their thresholds — require two muons, opposite charge, isolation, a b-jet
-   veto, a mass window, missing energy, b-tags… Watch, live:
-   - the **stacked histogram** (blue signal rising over grey background),
-   - **signal kept / background kept / purity**, and
-   - the **significance** climbing toward the discovery target.
-   Raise the **integrated luminosity** for more data (∝ √luminosity). When you
-   reach the target significance, **claim the discovery** and unlock the next
-   mission.
+6. **Analysis Lab** — the heart of the game, and it looks like a real CMS
+   analysis: **black data points** (recorded collisions — nobody knows which
+   are signal) over an **MC prediction stacked by process**, with an
+   uncertainty band and a **Data/MC ratio panel** underneath. Enable
+   **selection cuts** and drag their thresholds — require two muons, opposite
+   charge, isolation, a b-jet veto, a mass window, missing energy, b-tags…
+   Watch, live:
+   - the Data/MC plot (does the simulation describe the data?),
+   - a **cutflow table** (S / B / data surviving each cut),
+   - per-cut impact readouts, **signal kept / background kept / purity**, and
+   - the **significance** climbing toward the target.
+   Raise the **integrated luminosity** to reveal more data (∝ √luminosity).
+   The first mission, Z→μμ, runs as a **guided analysis**: goal → trigger →
+   object selection → backgrounds → mass window → Data/MC check → cutflow →
+   rediscovery (the Z is calibration, not a discovery!). Missions and chapters
+   award **concept cards** — the 📖 Concepts glossary explains every term, and
+   a learning map always shows where you are in the experimental chain.
 
 ### Missions
 Z → μμ · W → μν · H → γγ · tt̄ (b-tagging) · HH → bbττ · (heavy-ion: coming soon)
@@ -84,6 +91,7 @@ js/
   cms-school.js         Chapter 3: per-subsystem CMS lessons + mini-games
   reconstruction.js     Chapter 4: track-fit / ECAL-clustering / particle-flow games
   trigger.js            Chapter 5 UI + the shared TRIGGERS registry
+  curriculum.js         learning map stages + concept cards (glossary)
   accelerator.js        LHC map: counter-rotating beams, 4 IPs, collisions
   physics.js            invariant mass, 4-momenta, Asimov significance, RNG
   events.js             object types, processes, pileup, features, datasets
@@ -91,7 +99,7 @@ js/
   detector.js           CMS rendering (all object types + pileup) + hit-testing
   interaction.js        canvas mouse handling + object inspector
   analysis.js           cuts, significance, stacked histogram binning, cut UI
-  histogram.js          stacked signal+background histogram
+  histogram.js          Data/MC plot: per-process stack, data points, ratio panel
   content.js            identities, hints, feedback, closing text
   main.js               campaign flow + screen router
 test/
