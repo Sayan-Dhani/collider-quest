@@ -16,7 +16,7 @@ const TASKS = [
     id: 'ecal-clustering',
     title: 'ECAL Clustering',
     icon: '◈',
-    desc: 'Photons and electrons shower in the electromagnetic calorimeter. The energy is spread across neighbouring crystals. Group adjacent high-energy crystals into clusters and match them to tracks.',
+    desc: 'Photons and electrons shower in the electromagnetic calorimeter. The energy is spread across neighbouring crystals. Group adjacent high-energy crystals into clusters and identify the particle.',
   },
   {
     id: 'particle-flow',
@@ -49,15 +49,15 @@ function renderModeSelect() {
     <p class="muted">Reconstruction difficulty determines how many hints you get when building physics objects from raw detector signals.</p>
     <div class="rec-mode-grid">
       <button class="panel rec-mode-card" data-mode="beginner">
-        <h3>🌱 Beginner</h3>
+        <h3>Beginner</h3>
         <p class="muted small">Full hints: track colours match, hit sizes indicate energy, labels guide you.</p>
       </button>
       <button class="panel rec-mode-card" data-mode="intermediate">
-        <h3>🔶 Intermediate</h3>
+        <h3>Intermediate</h3>
         <p class="muted small">Partial hints: no colour coding, but hit order is preserved.</p>
       </button>
       <button class="panel rec-mode-card" data-mode="advanced">
-        <h3>🔥 Advanced</h3>
+        <h3>Advanced</h3>
         <p class="muted small">No hints: raw hits only, with pileup. Reconstruct like a real physicist.</p>
       </button>
     </div>`;
@@ -83,7 +83,7 @@ function getHintLevel() {
 function renderTask(idx) {
   if (idx >= TASKS.length) {
     _container.innerHTML = `
-      <h2>✓ Reconstruction Complete</h2>
+      <h2>Reconstruction Complete</h2>
       <p class="muted">You have learned how raw detector hits become physics objects. In the Event Explorer you will see fully reconstructed objects, but now you know what went into them.</p>
       <div class="brief-actions" style="margin-top:16px">
         <button class="btn btn-primary btn-big" id="rec-done">Continue →</button>
@@ -233,56 +233,138 @@ function renderTrackFit(area, hintLv, onDone) {
 // --- task 2: ECAL clustering --------------------------------------------------
 
 function renderECALClustering(area, hintLv, onDone) {
+  const n = 3;
   const objects = [];
-  const nObjs = 3;
-  for (let i = 0; i < nObjs; i++) {
+  for (let i = 0; i < n; i++) {
     const isElectron = Math.random() < 0.5;
+    const nCrystals = isElectron ? randInt(3, 5) : randInt(4, 7);
+    const totalE = randRange(20, 60);
+    const crystals = [];
+    const cx = randRange(40, 140);
+    const cy = randRange(40, 140);
+
+    // Generate crystal positions around the cluster center.
+    for (let j = 0; j < nCrystals; j++) {
+      const angle = (j / nCrystals) * Math.PI * 2 + gauss(0, 0.3);
+      const dist = randRange(4, 14);
+      const energy = totalE / nCrystals * (1 + gauss(0, 0.15));
+      crystals.push({
+        x: cx + dist * Math.cos(angle),
+        y: cy + dist * Math.sin(angle),
+        energy: Math.max(0.5, energy),
+        selected: false,
+      });
+    }
+
     objects.push({
-      id: i,
       hasTrack: isElectron,
-      nCrystals: isElectron ? randInt(3, 6) : randInt(4, 7),
-      totalE: randRange(15, 60).toFixed(0),
-      shape: isElectron ? 'compact' : 'slightly spread',
+      crystals,
+      totalE: totalE.toFixed(0),
       answer: isElectron ? 'electron' : 'photon',
     });
   }
-  let oIdx = 0;
 
-  function showObj() {
-    if (oIdx >= nObjs) {
-      area.innerHTML = '<p class="muted">✓ All objects clustered.</p>';
+  let objIdx = 0;
+
+  function drawECAL() {
+    const o = objects[objIdx];
+    const c = document.createElement('canvas');
+    c.width = 180; c.height = 180;
+    c.style.cssText = 'width:180px;height:180px;border-radius:8px;background:#0e1620;border:1px solid #26364a;margin:8px auto;display:block';
+
+    const ctx = c.getContext('2d');
+
+    // Draw ECAL grid background.
+    ctx.strokeStyle = 'rgba(255,225,77,0.08)';
+    ctx.lineWidth = 0.5;
+    for (let x = 10; x < 180; x += 8) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 180); ctx.stroke();
+    }
+    for (let y = 10; y < 180; y += 8) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(180, y); ctx.stroke();
+    }
+
+    // Draw crystals.
+    for (const cr of o.crystals) {
+      const size = 6 + (cr.energy / 15) * 4;
+      ctx.fillStyle = cr.selected
+        ? 'rgba(255,225,77,0.8)'
+        : `rgba(255,225,77,${0.15 + (cr.energy / 60) * 0.5})`;
+      ctx.fillRect(cr.x - size / 2, cr.y - size / 2, size, size);
+      ctx.strokeStyle = 'rgba(255,225,77,0.3)';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(cr.x - size / 2, cr.y - size / 2, size, size);
+
+      // Energy label for beginner mode.
+      if (hintLv >= 2) {
+        ctx.fillStyle = '#0e1620';
+        ctx.font = '7px system-ui';
+        ctx.textAlign = 'center';
+        ctx.fillText(cr.energy.toFixed(0), cr.x, cr.y + 3);
+      }
+    }
+
+    // Track indicator for electron (beginner mode).
+    if (hintLv >= 2 && o.hasTrack) {
+      ctx.strokeStyle = '#4da6ff';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(90, 180);
+      ctx.lineTo(cx, cy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#4da6ff';
+      ctx.font = '8px system-ui';
+      ctx.textAlign = 'center';
+      ctx.fillText('track', cx, cy + 18);
+    }
+
+    return c;
+  }
+
+  function showObject() {
+    if (objIdx >= n) {
+      area.innerHTML = '<p class="muted">✓ All objects clustered and identified.</p>';
       setTimeout(onDone, 400);
       return;
     }
-    const o = objects[oIdx];
+
+    const o = objects[objIdx];
     area.innerHTML = `
-      <p class="muted">Object ${oIdx + 1} of ${nObjs}: a cluster of ${o.nCrystals} ECAL crystals with total energy ${o.totalE} GeV. ${o.hasTrack ? 'A track points to it.' : 'No matching track.'}</p>
+      <p class="muted">Object ${objIdx + 1} of ${n}: a cluster of ${o.crystals.length} ECAL crystals with total energy ${o.totalE} GeV. ${o.hasTrack ? 'A track points to it.' : 'No matching track.'}</p>
+      <div id="rec-ecal-canvas"></div>
       <div style="display:flex;gap:8px;justify-content:center;margin:8px 0">
         <button class="btn chip rec-id">Electron</button>
         <button class="btn chip rec-id">Photon</button>
       </div>
       <div id="rec-ecal-fb"></div>`;
+
+    const canvasWrap = document.getElementById('rec-ecal-canvas');
+    canvasWrap.appendChild(drawECAL());
+
     area.querySelectorAll('.rec-id').forEach(b => {
       b.addEventListener('click', () => {
         const guess = b.textContent.toLowerCase();
         const correct = guess === o.answer;
         const fb = document.getElementById('rec-ecal-fb');
         fb.innerHTML = `<div class="feedback feedback-${correct ? 'good' : 'bad'}">${
-          correct ? '✓ Correct.' : '✗ ' + (o.answer === 'electron' ? 'A track points to this cluster — it is an electron.' : 'No track — this is a photon.')
+          correct ? '✓ Correct! ' + (o.answer === 'electron' ? 'Track + ECAL cluster = electron.' : 'ECAL cluster alone = photon.') : '✗ ' + (o.answer === 'electron' ? 'A track points to this cluster — it is an electron.' : 'No track — this is a photon.')
         }</div>`;
         area.querySelectorAll('.rec-id').forEach(bb => bb.disabled = true);
-        oIdx++;
-        setTimeout(showObj, 800);
+        objIdx++;
+        setTimeout(showObject, 800);
       });
     });
-    if (hintLv >= 2) {
+
+    if (hintLv >= 1) {
       const hint = document.createElement('p');
       hint.className = 'muted small';
-      hint.textContent = '💡 Electron = track + ECAL cluster. Photon = ECAL cluster only.';
+      hint.textContent = hintLv >= 2 ? '💡 Electron = track + ECAL cluster. Photon = ECAL cluster only.' : '💡 Look at the track info to distinguish electron from photon.';
       area.appendChild(hint);
     }
   }
-  showObj();
+  showObject();
 }
 
 // --- task 3: particle flow ----------------------------------------------------

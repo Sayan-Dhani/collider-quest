@@ -475,19 +475,45 @@ export function makeDisplayEvent(processName, pileupLevel = 3) {
 // `mcPerProcess` MC events per process and weight each so the summed weights
 // reproduce the expected pre-cut yields (standard MC practice). 250/process
 // keeps rare-tail estimates (tau fakes, mistags) reasonably smooth.
-export function makeDataset(mission, mcPerProcess = 250) {
+// `triggerId` is optionally a trigger ID from trigger.js; if provided, the
+// trigger selection is applied before offline cuts, reducing yields.
+export function makeDataset(mission, mcPerProcess = 250, triggerId = null) {
+  // Import trigger definitions if a trigger is specified.
+  let triggerDef = null;
+  if (triggerId && triggerId !== 'minBias') {
+    try {
+      // Dynamic import not possible in sync context; use inline definitions.
+      const TRIGGER_DEFS = {
+        doubleMuon: (f) => f.nMuons >= 2 && f.leadMuonPt > 17,
+        singleMuon: (f) => f.nMuons >= 1 && f.leadMuonPt > 24,
+        doublePhoton: (f) => f.nPhotons >= 2 && f.leadPhotonPt > 30,
+        jetMET: (f) => f.nJets >= 2 && f.met > 30,
+      };
+      triggerDef = TRIGGER_DEFS[triggerId] || null;
+    } catch {}
+  }
+
   const events = [];
   for (const p of mission.processes) {
-    const w = p.expected / mcPerProcess;
+    let w = p.expected / mcPerProcess;
     for (let i = 0; i < mcPerProcess; i++) {
       const { objects, met } = PROCESSES[p.name]();
       // light pileup so isolation/MET look realistic without dominating
       addPileup(objects, 1);
       const features = computeFeatures(objects, met);
+
+      // Apply trigger selection: if the event fails the trigger, it is not
+      // recorded (weight = 0). This reduces yields for mismatched triggers.
+      let recorded = true;
+      if (triggerDef) {
+        recorded = triggerDef(features);
+      }
+
       events.push({
         processName: p.name,
         truth: p.kind === 'signal' ? 'signal' : 'bkg',
-        weight: w,
+        weight: recorded ? w : 0,
+        recorded,
         features,
         // value that goes on the observable axis for this mission
         observable: features[mission.observable.feature] ?? null,

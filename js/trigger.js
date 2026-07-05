@@ -2,7 +2,7 @@
 // Chapter 5 — Trigger the Data
 // Teaches how the CMS trigger system selects which collision events to keep.
 // Player chooses a trigger strategy for the Z→μμ analysis and sees the
-// rate/efficiency trade-off.
+// rate/efficiency trade-off. The chosen trigger is applied to the dataset.
 
 const TRIGGERS = [
   {
@@ -13,6 +13,7 @@ const TRIGGERS = [
     signalEff: 0.92,
     bkgEff: 0.08,
     bestFor: 'z-mumu',
+    test: (f) => f.nMuons >= 2 && f.leadMuonPt > 17,
   },
   {
     id: 'singleMuon',
@@ -22,6 +23,7 @@ const TRIGGERS = [
     signalEff: 0.97,
     bkgEff: 0.25,
     bestFor: 'w-munu',
+    test: (f) => f.nMuons >= 1 && f.leadMuonPt > 24,
   },
   {
     id: 'doublePhoton',
@@ -31,6 +33,7 @@ const TRIGGERS = [
     signalEff: 0.88,
     bkgEff: 0.04,
     bestFor: 'higgs-gg',
+    test: (f) => f.nPhotons >= 2 && f.leadPhotonPt > 30,
   },
   {
     id: 'jetMET',
@@ -40,6 +43,7 @@ const TRIGGERS = [
     signalEff: 0.85,
     bkgEff: 0.15,
     bestFor: 'top-lj',
+    test: (f) => f.nJets >= 2 && f.met > 30,
   },
   {
     id: 'minBias',
@@ -49,6 +53,7 @@ const TRIGGERS = [
     signalEff: 1.0,
     bkgEff: 1.0,
     bestFor: null,
+    test: () => true,
   },
 ];
 
@@ -62,6 +67,16 @@ export function startTrigger(container, { onComplete, context = 'z-mumu' }) {
   _onComplete = onComplete || (() => {});
   _chosen = null;
   renderMenu(context);
+}
+
+// Get the chosen trigger ID (for external use).
+export function getChosenTrigger() {
+  return _chosen;
+}
+
+// Get a trigger by ID.
+export function getTrigger(id) {
+  return TRIGGERS.find(t => t.id === id) || null;
 }
 
 // --- trigger menu -------------------------------------------------------------
@@ -121,6 +136,15 @@ function showResult(trigger, context) {
     <div class="feedback feedback-${isBest ? 'good' : (trigger.rate > 60 ? 'bad' : 'bad')}">${feedback}</div>
     <div class="trigger-fact">
       <p class="muted small">⚡ Real CMS fact: The Level-1 trigger uses custom hardware to make a decision in under 4 microseconds, reducing the rate from 40 MHz to 100 kHz. The High-Level Trigger (software) then further reduces it to ~1 kHz for storage.</p>
+    </div>
+    <div class="trigger-impact">
+      <h3>Impact on Your Analysis</h3>
+      <div class="trigger-impact-grid">
+        <div class="trigger-impact-item"><span class="muted small">Signal kept</span><b>${Math.round(trigger.signalEff * 100)}%</b></div>
+        <div class="trigger-impact-item"><span class="muted small">Background rejected</span><b>${Math.round((1 - trigger.bkgEff) * 100)}%</b></div>
+        <div class="trigger-impact-item"><span class="muted small">Data rate</span><b>${trigger.rate} kHz</b></div>
+        <div class="trigger-impact-item"><span class="muted small">Storage/yr</span><b>${(trigger.rate * 365.25 * 86400 / 1e9).toFixed(1)} PB</b></div>
+      </div>
     </div>
     <div class="brief-actions" style="margin-top:12px">
       <button class="btn btn-primary btn-big" id="trigger-continue">Continue →</button>

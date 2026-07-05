@@ -211,13 +211,25 @@ function renderFeedback(container, fb) {
 const BASE_LUMI_FB = 25; // "×1" on the slider ~ one good LHC data-taking year
 const lumiLabel = (l) => `${Math.round(BASE_LUMI_FB * l)} fb⁻¹`;
 
+function getChosenTriggerId() {
+  // Check runtime state first.
+  if (_chosenTriggerId) return _chosenTriggerId;
+  // Check progress for stored trigger.
+  for (const p of progress) {
+    if (p.startsWith('trigger-')) return p.replace('trigger-', '');
+  }
+  return 'minBias';
+}
+
 function openLab() {
+  const triggerId = getChosenTriggerId();
   lab = {
-    dataset: makeDataset(mission),
+    dataset: makeDataset(mission, 250, triggerId),
     states: initStates(mission),
     lumi: 1,
     result: null,
     impactEls: null,
+    triggerId,
   };
   $('lab-title').textContent = `${mission.title} — Analysis Lab`;
   $('lumi-range').value = 1;
@@ -359,16 +371,20 @@ function openReconstruction() {
 }
 
 // --- Chapter 5 — Trigger the Data -------------------------------------------
+let _chosenTriggerId = null;
+
 function openTrigger() {
   els.triggerIntro.textContent = TRIGGER_INTRO;
   show('screen-trigger');
   trigger.startTrigger(els.triggerContent, {
     onComplete: () => {
+      _chosenTriggerId = trigger.getChosenTrigger();
       progress.add('chapter-5');
+      progress.add('trigger-' + (_chosenTriggerId || 'minBias'));
       saveProgress();
       openAccelerator();
     },
-    context: 'z-mumu',
+    context: mission ? mission.id : 'z-mumu',
   });
 }
 
