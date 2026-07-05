@@ -216,7 +216,24 @@ main { padding: 22px; max-width: 1200px; margin: 0 auto; }
 .cut-name { flex: 1; }
 .cut-slider { margin: 9px 0 2px; }
 .cut-slider input[type=range] { width: 100%; accent-color: var(--accent-2); }
+.cut-impact { font-size: 11px; color: var(--accent-2); margin-top: 5px; min-height: 0; }
+.cut-impact:empty { display: none; }
 .cut-hint { margin: 6px 0 0; font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+/* Lab teachable-moment hint (shown when a change lowers significance). */
+.lab-hint {
+  margin: 12px 0 0; padding: 10px 12px; font-size: 13px; line-height: 1.5;
+  color: #ffd0d0; background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.4); border-radius: 10px;
+}
+
+/* End-of-Explorer summary card. */
+.exp-summary {
+  margin-top: 12px; padding: 12px;
+  background: rgba(0, 255, 198, 0.07); border: 1px solid rgba(0, 255, 198, 0.35);
+  border-radius: 10px;
+}
+.exp-summary p { margin: 0 0 10px; line-height: 1.55; font-size: 14px; }
 
 /* ---- metrics ---- */
 .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }

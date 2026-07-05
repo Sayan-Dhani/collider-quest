@@ -5,11 +5,12 @@
 export const TAGLINE = 'Collide particles. Decode the traces. Discover the invisible.';
 
 export const ACCELERATOR_INTRO =
-  'Two proton beams race around the 27 km ring in opposite directions and are ' +
-  'steered into each other at four points — where the CMS, ATLAS, ALICE and LHCb ' +
-  'detectors sit. At 6.8 TeV per beam the bunches cross ~40 million times a ' +
-  'second. Click an interaction point to learn about its experiment; enter CMS ' +
-  'to reconstruct the collisions yourself.';
+  'Two proton beams — injected from the SPS at 0.45 TeV — race around the 27 km ' +
+  'ring in opposite directions and are steered into each other at four points, ' +
+  'where the CMS, ATLAS, ALICE and LHCb detectors sit. At 6.8 TeV per beam ' +
+  '(13.6 TeV collision energy) the bunches cross ~40 million times a second. ' +
+  'Click an interaction point to learn about its experiment; enter CMS to ' +
+  'reconstruct the collisions yourself.';
 
 export const ACC_INFO_DEFAULT =
   'Hover or click an interaction point. CMS and ATLAS sit opposite each other on ' +
@@ -63,12 +64,23 @@ export function processFeedback(correct, chosenLabel, truthLabel) {
   };
 }
 
-// Discovery-screen headline by significance vs. target.
+// Discovery-screen headline by significance vs. the mission's own target.
+// "Discovery!" is only earned when the mission bar itself is met — a 5σ blip
+// halfway to a 12σ calibration target is not a discovery headline.
 export function resultHeadline(sig, target) {
-  if (sig >= 5) return 'Discovery!';
-  if (sig >= target) return 'Target reached!';
+  if (sig >= target) return target >= 5 ? 'Discovery!' : 'Evidence secured!';
   if (sig >= 3) return 'Evidence — but not yet a discovery';
   return 'Not there yet';
+}
+
+// End-of-Explorer summary: acknowledge the player's eye, then motivate the Lab.
+export function explorerSummary(idCorrect, idTotal, procCorrect, procTotal) {
+  const idPart = idTotal > 0
+    ? `You identified ${idCorrect} of ${idTotal} objects`
+    : 'You inspected the events';
+  return `${idPart} and classified ${procCorrect} of ${procTotal} events correctly. ` +
+    'Eyeballing single events only goes so far — real analyses decide with ' +
+    'statistics, across thousands of events at once. Time for the Analysis Lab.';
 }
 
 export const CLOSING =

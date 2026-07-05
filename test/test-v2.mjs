@@ -1,11 +1,25 @@
-// v2 logic tests: features, dataset weighting, cuts, and winnability.
+// v2 logic tests: features, kinematics, dataset weighting, cuts, winnability.
+// Runs on a FIXED SEED so the stochastic assertions cannot flake.
 const R = '/eos/home-s/sadhani/claude_code_test/collider-quest/js';
 const { makeDataset, makeDisplayEvent, PROCESSES } = await import(`${R}/events.js`);
 const { MISSIONS, getMission } = await import(`${R}/missions.js`);
-const { initStates, computeResult, binStacked, confidenceLabel } = await import(`${R}/analysis.js`);
+const { initStates, computeResult, binStacked, cutImpacts, confidenceLabel } = await import(`${R}/analysis.js`);
+const { setSeed, degToRad } = await import(`${R}/physics.js`);
+
+setSeed(20260705);
 
 let fail = 0;
 const ok = (c, m) => { console.log((c ? '  ok  ' : ' FAIL ') + m); if (!c) fail++; };
+
+// 0. Determinism: the same seed reproduces the same event.
+{
+  setSeed(42);
+  const a = makeDisplayEvent('Z_mumu', 2).features.dimuonMass;
+  setSeed(42);
+  const b = makeDisplayEvent('Z_mumu', 2).features.dimuonMass;
+  ok(a === b, `seeded RNG is deterministic (${a.toFixed(3)})`);
+  setSeed(20260705);
+}
 
 // 1. Z_mumu display event has two OS muons near the Z mass.
 {
@@ -16,7 +30,32 @@ const ok = (c, m) => { console.log((c ? '  ok  ' : ' FAIL ') + m); if (!c) fail+
   ok(e.objects.some(o => o.kind === 'pileupTrack'), 'display event includes pileup');
 }
 
-// 2. ttbar_2mu has b-jets and real MET; QCD fake muons are non-isolated.
+// 2. MET BALANCE: for every process, the visible hard-process objects plus the
+// reported MET vector sum to ~zero (only the soft unclustered term remains).
+{
+  const names = Object.keys(PROCESSES);
+  for (const name of names) {
+    let sum = 0;
+    const n = 200;
+    for (let i = 0; i < n; i++) {
+      const { objects, met } = PROCESSES[name]();
+      let px = 0, py = 0;
+      for (const o of objects) {
+        if (!o.fromHardProcess) continue;
+        const a = degToRad(o.angle);
+        px += o.pt * Math.cos(a); py += o.pt * Math.sin(a);
+      }
+      const am = degToRad(met.angle);
+      px += met.magnitude * Math.cos(am);
+      py += met.magnitude * Math.sin(am);
+      sum += Math.hypot(px, py);
+    }
+    const avg = sum / n;
+    ok(avg < 18, `${name}: |sum(visible pT) + MET| avg ${avg.toFixed(1)} GeV (< 18, transverse plane balances)`);
+  }
+}
+
+// 3. ttbar_2mu has b-jets and real (balance-derived) MET; QCD fakes non-isolated.
 {
   let bj = 0, met = 0, n = 200;
   for (let i = 0; i < n; i++) { const f = makeDisplayEvent('ttbar_2mu', 1).features; bj += f.nBjets; met += f.met; }
@@ -26,14 +65,40 @@ const ok = (c, m) => { console.log((c ? '  ok  ' : ' FAIL ') + m); if (!c) fail+
   ok(iso / n > 0.25, `QCD fake muon avg iso ${(iso/n).toFixed(2)} (non-isolated)`);
 }
 
-// 3. Higgs diphoton peaks at 125; continuum is smooth.
+// 4. W JACOBIAN EDGE: mT piles up below the W mass and dies above it.
+{
+  const n = 1500;
+  let inEdge = 0, above95 = 0, above100 = 0;
+  for (let i = 0; i < n; i++) {
+    const mT = makeDisplayEvent('W_munu', 0).features.mT;
+    if (mT >= 60 && mT <= 85) inEdge++;
+    if (mT >= 95 && mT <= 120) above95++;
+    if (mT > 100) above100++;
+  }
+  ok(inEdge / n > 3 * (above95 / n),
+    `W mT Jacobian edge: ${(100*inEdge/n).toFixed(0)}% in [60,85] vs ${(100*above95/n).toFixed(1)}% in [95,120]`);
+  ok(above100 / n < 0.05, `W mT beyond 100 GeV is rare (${(100*above100/n).toFixed(1)}% < 5%)`);
+}
+
+// 5. DRELL-YAN CONTINUITY: the non-resonant spectrum has no hole under the Z.
+{
+  const n = 4000;
+  const bins = new Array(8).fill(0); // 76..108 in 4 GeV bins
+  for (let i = 0; i < n; i++) {
+    const m = makeDisplayEvent('DY_continuum', 0).features.dimuonMass;
+    if (m >= 76 && m < 108) bins[Math.floor((m - 76) / 4)]++;
+  }
+  ok(bins.every(b => b > 0), `DY spectrum continuous under the Z peak (76-108 bins: ${bins.join(',')})`);
+}
+
+// 6. Higgs diphoton peaks at 125; continuum is smooth.
 {
   const hs = []; for (let i = 0; i < 500; i++) hs.push(makeDisplayEvent('H_gg', 1).features.diphotonMass);
   const mean = hs.reduce((a, b) => a + b) / hs.length;
   ok(Math.abs(mean - 125) < 5, `H->gg mean ${mean.toFixed(1)} ~125`);
 }
 
-// 4. Dataset weighting reproduces expected yields.
+// 7. Dataset weighting reproduces expected yields.
 {
   const m = getMission('higgs-gg');
   const ds = makeDataset(m, 120);
@@ -44,7 +109,8 @@ const ok = (c, m) => { console.log((c ? '  ok  ' : ' FAIL ') + m); if (!c) fail+
   }
 }
 
-// 5. WINNABILITY: a good analyst's cuts reach each mission's target significance.
+// 8. WINNABILITY (with margin): a good analyst's cuts clear each mission's
+// target with >=10% headroom, so play-through balance is robust.
 function goodStates(m) {
   const s = initStates(m);
   for (const c of m.cuts) {
@@ -53,18 +119,17 @@ function goodStates(m) {
     else if (c.kind === 'max' && c.feature.includes('Iso')) s[c.id].value = 0.15;
     else s[c.id].value = c.value;
   }
-  // Don't require BOTH b-tag toggles at once where redundant; keep as-is (>=1 and >=2 both on == >=2).
   return s;
 }
 for (const m of MISSIONS) {
   if (m.locked) continue;
   const ds = makeDataset(m, 200);
   const r = computeResult(ds, m, goodStates(m));
-  ok(r.significance >= m.target,
-    `${m.id}: significance ${r.significance.toFixed(1)}σ >= target ${m.target}σ  (S=${r.S.toFixed(0)}, B=${r.B.toFixed(0)}, sigEff=${(r.sigEff*100)|0}%, bkgEff=${(r.bkgEff*100)|0}%)`);
+  ok(r.significance >= m.target * 1.1,
+    `${m.id}: significance ${r.significance.toFixed(1)}σ >= 1.1×target ${m.target}σ  (S=${r.S.toFixed(0)}, B=${r.B.toFixed(0)}, sigEff=${(r.sigEff*100)|0}%, bkgEff=${(r.bkgEff*100)|0}%)`);
 }
 
-// 6. No cuts => significance is low (there IS a discovery arc to climb).
+// 9. No cuts => significance is low (there IS a discovery arc to climb).
 for (const m of MISSIONS) {
   if (m.locked) continue;
   const ds = makeDataset(m, 200);
@@ -72,18 +137,28 @@ for (const m of MISSIONS) {
   ok(r.significance < m.target, `${m.id}: pre-cut significance ${r.significance.toFixed(1)}σ < target (arc exists)`);
 }
 
-// 7. binStacked buckets weighted signal/bkg correctly.
+// 10. binStacked buckets weighted signal correctly.
 {
   const m = getMission('z-mumu');
   const ds = makeDataset(m, 100);
-  const r = computeResult(ds, m, goodStates(m));
-  const passing = ds.filter(ev => {
-    const s = goodStates(m);
-    return true; // computeResult already filtered; re-derive for bin test below
-  });
   const binned = binStacked(ds.filter(ev => ev.observable != null && ev.truth === 'signal'), m.observable);
   const total = binned.sig.reduce((a, b) => a + b, 0);
   ok(total > 0, 'binStacked accumulates signal weight');
+}
+
+// 11. cutImpacts: N-1 impacts are sane and the mass window hurts background
+// far more than signal.
+{
+  const m = getMission('z-mumu');
+  const ds = makeDataset(m, 200);
+  const states = goodStates(m);
+  const imp = cutImpacts(ds, m, states);
+  const vals = Object.values(imp);
+  ok(vals.length === m.cuts.length, `cutImpacts covers all ${m.cuts.length} enabled cuts`);
+  ok(vals.every(v => v.sigRemoved >= 0 && v.sigRemoved <= 1 && v.bkgRemoved >= 0 && v.bkgRemoved <= 1),
+    'cutImpacts fractions within [0,1]');
+  ok(imp.mass.bkgRemoved > imp.mass.sigRemoved,
+    `mass window removes more bkg (${(100*imp.mass.bkgRemoved)|0}%) than signal (${(100*imp.mass.sigRemoved)|0}%)`);
 }
 
 console.log(fail === 0 ? '\nALL PASS' : `\n${fail} FAILURES`);

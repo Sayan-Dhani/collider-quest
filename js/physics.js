@@ -55,11 +55,32 @@ export function pairMass(objA, objB, mass = 0) {
   return invariantMass([qa, qb]);
 }
 
+// --- random numbers ----------------------------------------------------------
+// Mulberry32: a tiny seedable PRNG. The game seeds itself from Math.random() at
+// load so play stays varied; the node tests call setSeed() for reproducible
+// datasets (the winnability assertions must not flake).
+let _rng;
+export function setSeed(seed) {
+  let a = seed >>> 0;
+  _rng = () => {
+    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+setSeed(Math.floor(Math.random() * 2 ** 32));
+
+// Uniform random float in [0, 1).
+export function rand() {
+  return _rng();
+}
+
 // Gaussian sample (Box-Muller) centered on `mean` with std `sigma`.
 export function gauss(mean, sigma) {
   let u = 0, v = 0;
-  while (u === 0) u = Math.random();
-  while (v === 0) v = Math.random();
+  while (u === 0) u = rand();
+  while (v === 0) v = rand();
   const n = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
   return mean + sigma * n;
 }
@@ -76,15 +97,15 @@ export function significance(S, B) {
 
 // Uniform random float in [min, max).
 export function randRange(min, max) {
-  return min + Math.random() * (max - min);
+  return min + rand() * (max - min);
 }
 
 // Random integer in [min, max] inclusive.
 export function randInt(min, max) {
-  return Math.floor(min + Math.random() * (max - min + 1));
+  return Math.floor(min + rand() * (max - min + 1));
 }
 
 // Random element of an array.
 export function pick(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
+  return arr[Math.floor(rand() * arr.length)];
 }

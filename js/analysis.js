@@ -61,6 +61,35 @@ export function binStacked(passing, observable, lumi = 1) {
   return { sig, bkg, xmin, xmax, bins };
 }
 
+// Marginal (N-1) impact of each ENABLED cut: of the signal/background that
+// passes all the OTHER enabled cuts, what fraction does this cut remove?
+// This is how analysts judge which selection is doing the work.
+export function cutImpacts(dataset, mission, states) {
+  const enabled = mission.cuts.filter((c) => states[c.id].enabled);
+  const acc = {};
+  for (const c of enabled) acc[c.id] = { sAll: 0, bAll: 0, sCut: 0, bCut: 0 };
+  for (const ev of dataset) {
+    const passes = enabled.map((c) => evalCut(c, ev.features, states[c.id]));
+    const nFail = passes.reduce((n, p) => n + (p ? 0 : 1), 0);
+    if (nFail > 1) continue; // fails 2+ cuts: contributes to no N-1 sample
+    for (let i = 0; i < enabled.length; i++) {
+      if (nFail === 1 && passes[i]) continue; // the one failure is another cut
+      const t = acc[enabled[i].id];
+      if (ev.truth === 'signal') { t.sAll += ev.weight; if (!passes[i]) t.sCut += ev.weight; }
+      else { t.bAll += ev.weight; if (!passes[i]) t.bCut += ev.weight; }
+    }
+  }
+  const out = {};
+  for (const c of enabled) {
+    const t = acc[c.id];
+    out[c.id] = {
+      sigRemoved: t.sAll > 0 ? t.sCut / t.sAll : 0,
+      bkgRemoved: t.bAll > 0 ? t.bCut / t.bAll : 0,
+    };
+  }
+  return out;
+}
+
 // Discovery-confidence label from significance (particle-physics convention).
 export function confidenceLabel(sig) {
   if (sig >= 5) return { text: 'Discovery (5σ+)', tone: 'good' };
@@ -71,9 +100,12 @@ export function confidenceLabel(sig) {
 
 // --- DOM: cut controls -------------------------------------------------------
 
-// Render the cut panel. `onChange` fires after any state change.
+// Render the cut panel. `onChange` fires after any state change. Returns a
+// Map cutId -> element for the per-cut impact line, updated separately via
+// renderCutImpacts (re-rendering whole rows would steal slider focus).
 export function renderCuts(container, mission, states, onChange) {
   container.innerHTML = '';
+  const impactEls = new Map();
   for (const cut of mission.cuts) {
     const st = states[cut.id];
     const row = document.createElement('div');
@@ -116,12 +148,28 @@ export function renderCuts(container, mission, states, onChange) {
     }
     row.appendChild(valWrap);
 
+    const impact = document.createElement('div');
+    impact.className = 'cut-impact';
+    row.appendChild(impact);
+    impactEls.set(cut.id, impact);
+
     const hint = document.createElement('p');
     hint.className = 'cut-hint';
     hint.textContent = cut.hint;
     row.appendChild(hint);
 
     container.appendChild(row);
+  }
+  return impactEls;
+}
+
+// Fill each enabled cut's impact line ("what is this cut doing right now?").
+export function renderCutImpacts(impactEls, impacts) {
+  for (const [id, el] of impactEls) {
+    const im = impacts[id];
+    el.textContent = im
+      ? `removes ${Math.round(im.bkgRemoved * 100)}% of background · ${Math.round(im.sigRemoved * 100)}% of signal`
+      : '';
   }
 }
 

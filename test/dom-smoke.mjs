@@ -118,8 +118,20 @@ step('guess a process', () => {
   const b = box._children[0];
   b && b.click();
 });
-step('next explorer event', () => getEl('exp-next').click());
-step('go to analysis lab', () => getEl('exp-to-lab').click());
+// Play through the remaining explorer events to reach the end-of-run summary.
+for (let evtNo = 2; evtNo <= 4; evtNo++) {
+  step(`next explorer event (${evtNo})`, () => getEl('exp-next').click());
+  step(`guess process (${evtNo})`, () => {
+    const b = getEl('exp-process')._children[0];
+    if (!b) throw new Error('no process buttons rendered');
+    b.click();
+  });
+}
+step('explorer summary appears after final event', () => {
+  if (getEl('exp-summary').hidden !== false) throw new Error('summary not shown');
+  if (!getEl('exp-summary-text').textContent) throw new Error('summary text empty');
+});
+step('summary hand-off -> analysis lab', () => getEl('exp-summary-lab').click());
 step('toggle every cut on', () => {
   const panel = getEl('cuts-panel');
   // cut checkboxes are the first input in each cut-row; dispatch change=checked

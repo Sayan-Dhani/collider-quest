@@ -9,11 +9,12 @@ import * as accelerator from './accelerator.js';
 import { renderStacked } from './histogram.js';
 import { attachCanvas, renderInspector } from './interaction.js';
 import {
-  initStates, computeResult, binStacked, renderCuts, renderMetrics, confidenceLabel,
+  initStates, computeResult, binStacked, cutImpacts,
+  renderCuts, renderCutImpacts, renderMetrics, confidenceLabel,
 } from './analysis.js';
 import {
   TAGLINE, HOME_INTRO, ACCELERATOR_INTRO, ACC_INFO_DEFAULT,
-  idFeedback, processFeedback, resultHeadline, CLOSING,
+  idFeedback, processFeedback, explorerSummary, resultHeadline, CLOSING,
 } from './content.js';
 
 const $ = (id) => document.getElementById(id);
@@ -84,7 +85,8 @@ function openBriefing(m) {
   $('brief-story').textContent = m.story;
   $('brief-lesson').textContent = m.lesson;
   $('brief-objective').textContent =
-    `Reach ${m.target}σ significance for ${m.tagline} by cutting away the background.`;
+    `Reach ${m.target}σ significance for ${m.tagline} by cutting away the background.` +
+    (m.targetNote ? ` ${m.targetNote}` : '');
   const list = $('brief-explore');
   list.innerHTML = '';
   for (const e of m.explore) {
@@ -100,7 +102,8 @@ const EXPLORER_EVENTS = 4;
 
 function openExplorer() {
   exp = { index: 0, total: EXPLORER_EVENTS, event: null, activeId: null, hoveredId: null,
-          selection: new Map(), guessed: false };
+          selection: new Map(), guessed: false,
+          idCorrect: 0, idTotal: 0, procCorrect: 0 };
   $('exp-title').textContent = mission.title;
   nextExplorerEvent();
   show('screen-explorer');
@@ -118,6 +121,7 @@ function nextExplorerEvent() {
   renderProcessButtons(false);
   els.expFeedback.innerHTML = '';
   els.expNext.hidden = true;
+  els.expSummary.hidden = true;
 }
 
 function redrawDetector() {
@@ -144,6 +148,8 @@ function onIdentify(label) {
   exp.selection.set(exp.activeId, label);
   if (first) {
     const correct = obj.truthLabel === label;
+    exp.idTotal++;
+    if (correct) exp.idCorrect++;
     renderFeedback(els.expFeedback, idFeedback(correct, obj.truthLabel));
   }
   renderInspector(els.inspector, obj, label, onIdentify);
@@ -168,11 +174,16 @@ function onProcessGuess(name) {
   exp.guessed = true;
   const truthLabel = mission.explore.find((e) => e.name === exp.event.processName).label;
   const correct = name === exp.event.processName;
+  if (correct) exp.procCorrect++;
   renderFeedback(els.expFeedback, processFeedback(correct, name, truthLabel));
   renderProcessButtons(true);
   exp.index++;
   if (exp.index >= exp.total) {
+    // End of the Explorer run: sum up and hand off to the Lab.
     els.expNext.hidden = true;
+    $('exp-summary-text').textContent =
+      explorerSummary(exp.idCorrect, exp.idTotal, exp.procCorrect, exp.total);
+    els.expSummary.hidden = false;
   } else {
     els.expNext.hidden = false;
   }
@@ -188,26 +199,42 @@ function renderFeedback(container, fb) {
 }
 
 // ============================ ANALYSIS LAB ==================================
+const BASE_LUMI_FB = 25; // "×1" on the slider ~ one good LHC data-taking year
+const lumiLabel = (l) => `${Math.round(BASE_LUMI_FB * l)} fb⁻¹`;
+
 function openLab() {
   lab = {
     dataset: makeDataset(mission),
     states: initStates(mission),
     lumi: 1,
     result: null,
+    impactEls: null,
   };
   $('lab-title').textContent = `${mission.title} — Analysis Lab`;
   $('lumi-range').value = 1;
-  $('lumi-val').textContent = '×1.0';
-  renderCuts(els.cutsPanel, mission, lab.states, recomputeLab);
+  $('lumi-val').textContent = lumiLabel(1);
+  lab.impactEls = renderCuts(els.cutsPanel, mission, lab.states, recomputeLab);
   recomputeLab();
   show('screen-lab');
 }
 
 function recomputeLab() {
+  const prev = lab.result;
   const r = computeResult(lab.dataset, mission, lab.states, lab.lumi);
   lab.result = r;
   renderMetrics(els.metrics, r, mission);
+  renderCutImpacts(lab.impactEls, cutImpacts(lab.dataset, mission, lab.states));
   renderStacked(els.labCanvas, binStacked(r.passing, mission.observable, lab.lumi), mission.observable);
+
+  // Teachable moment: a change that LOWERED significance by costing signal.
+  if (prev && r.significance < prev.significance - 0.2 && r.sigEff < prev.sigEff) {
+    els.labHint.textContent =
+      '⚠ Significance fell — that change cost more signal than the background it removed. Too-tight cuts throw away the discovery.';
+    els.labHint.hidden = false;
+  } else if (prev && r.significance >= prev.significance) {
+    els.labHint.hidden = true;
+  }
+
   const reached = r.significance >= mission.target;
   els.btnClaim.disabled = !reached;
   els.btnClaim.textContent = reached ? '★ Claim discovery' : `Reach ${mission.target}σ to claim`;
@@ -215,7 +242,7 @@ function recomputeLab() {
 
 function onLumiChange() {
   lab.lumi = parseFloat($('lumi-range').value);
-  $('lumi-val').textContent = `×${lab.lumi.toFixed(1)}`;
+  $('lumi-val').textContent = lumiLabel(lab.lumi);
   recomputeLab();
 }
 
@@ -235,7 +262,7 @@ function claimDiscovery() {
     ['Background events', Math.round(r.B)],
     ['Purity', `${Math.round(r.purity * 100)}%`],
     ['Signal efficiency', `${Math.round(r.sigEff * 100)}%`],
-    ['Luminosity used', `×${lab.lumi.toFixed(1)}`],
+    ['Luminosity used', lumiLabel(lab.lumi)],
     ['Cuts applied', nCuts],
   ];
   els.resultStats.innerHTML = '';
@@ -345,8 +372,10 @@ function init() {
     expProcess: $('exp-process'),
     expFeedback: $('exp-feedback'),
     expNext: $('exp-next'),
+    expSummary: $('exp-summary'),
     cutsPanel: $('cuts-panel'),
     metrics: $('metrics'),
+    labHint: $('lab-hint'),
     labCanvas: $('lab-canvas'),
     btnClaim: $('btn-claim'),
     resultStats: $('result-stats'),
@@ -395,6 +424,7 @@ function init() {
   $('btn-skip-lab').addEventListener('click', openLab);
   $('exp-next').addEventListener('click', nextExplorerEvent);
   $('exp-to-lab').addEventListener('click', openLab);
+  $('exp-summary-lab').addEventListener('click', openLab);
   $('lumi-range').addEventListener('input', onLumiChange);
   $('btn-claim').addEventListener('click', claimDiscovery);
 

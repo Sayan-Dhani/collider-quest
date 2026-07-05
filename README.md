@@ -85,19 +85,28 @@ and background processes (with expected yields), which observable to plot, and
 which cuts the player can apply. The Explorer and Analysis Lab are generic — a
 new scenario is a new entry, not new engine code. The physics is deliberately
 simplified (educational, not a real simulation) but the *logic* is real:
-isolation, mass windows, b-tag/MET requirements, and Asimov significance
-`√(2((S+B)ln(1+S/B) − S))`.
+events **balance in the transverse plane** (missing pT is literally minus the
+vector sum of what you see, so W events point their MET away from the muon and
+the W transverse mass ends in a genuine Jacobian edge at 80.4 GeV), the
+Drell–Yan continuum runs smoothly under the Z peak (irreducible background),
+and the cuts are the real ones: isolation, mass windows, b-tag/MET
+requirements, with Asimov significance `√(2((S+B)ln(1+S/B) − S))`.
 
 ## Test
 
 ```bash
-npm test        # runs node test/test-v2.mjs
+npm test        # runs test/test-v2.mjs + test/dom-smoke.mjs
 ```
 
-Checks resonances reconstruct at the right mass, dataset weighting reproduces
-expected yields, isolation/b-tag behaviour is correct, and — crucially — that
-every mission is **winnable** (a good set of cuts reaches its target
-significance) yet has a real discovery arc (low significance before cuts).
+Runs on a **fixed RNG seed** (deterministic). Checks resonances reconstruct at
+the right mass, the transverse plane balances (|Σ visible pT + MET| ≈ soft
+term) for every process, the W mT spectrum has its Jacobian edge, the
+Drell–Yan spectrum is continuous under the Z peak, dataset weighting
+reproduces expected yields, isolation/b-tag behaviour is correct, and —
+crucially — that every mission is **winnable with ≥10% headroom** (a good set
+of cuts clears its target significance) yet has a real discovery arc (low
+significance before cuts). The DOM smoke test then drives a full headless
+playthrough.
 
 ## Roadmap
 

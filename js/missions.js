@@ -49,12 +49,16 @@ export const MISSIONS = [
     story:
       'Before hunting for new physics, every experiment re-discovers what it ' +
       'already knows. Your first job is to pull the Z boson out of a flood of ' +
-      'background: Drell–Yan pairs, top decays, and QCD fakes all produce ' +
-      'muon-like tracks. Apply the right criteria and a sharp peak at 91 GeV ' +
-      'should rise out of the noise.',
+      'background: non-resonant Drell–Yan pairs, top decays, and QCD fakes all ' +
+      'produce muon-like tracks. Apply the right criteria and a sharp peak at ' +
+      '91 GeV should rise out of the noise — though some dimuon background sits ' +
+      'right under the peak and can never be cut away.',
     lesson:
       'A Z boson decays instantly — we reconstruct it from two opposite-charge ' +
       'muons. Isolation, a b-jet veto and a mass window separate it from lookalikes.',
+    targetNote:
+      'The Z is produced in huge numbers, so this rediscovery is a calibration ' +
+      'exercise — the bar sits far above the 5σ discovery convention.',
     observable: { name: 'Dimuon invariant mass', feature: 'dimuonMass', unit: 'GeV', xmin: 60, xmax: 120, bins: 30, target: 91.2 },
     explore: [
       { name: 'Z_mumu', label: 'signal: Z → μμ' },
@@ -92,7 +96,11 @@ export const MISSIONS = [
       'piles up below the W mass in a "Jacobian edge".',
     lesson:
       'Neutrinos leave no trace. We infer them from missing transverse momentum, ' +
-      'and reconstruct the W through the transverse mass mT.',
+      'and reconstruct the W through the transverse mass mT — which can never ' +
+      'exceed the W mass, so events pile up against a sharp edge instead of a peak.',
+    targetNote:
+      'Like the Z, the W is abundant at the LHC: this is a rediscovery ' +
+      'measurement, so the bar is far above the 5σ discovery convention.',
     observable: { name: 'Transverse mass mT(μ, MET)', feature: 'mT', unit: 'GeV', xmin: 0, xmax: 120, bins: 30, target: 80.4 },
     explore: [
       { name: 'W_munu', label: 'signal: W → μν (muon + missing pT)' },
@@ -125,11 +133,15 @@ export const MISSIONS = [
     story:
       'The Higgs is rare, and H → γγ is a needle in a haystack: a smooth sea of ' +
       'ordinary diphoton events buries a tiny bump at 125 GeV. Photons that are ' +
-      'really jets sneak in too. Sharpen your selection until a small, ' +
-      'unmistakable excess appears over the falling background.',
+      'really jets sneak in too. Expect to see nothing at first — sharpen your ' +
+      'selection until a small, unmistakable excess appears over the falling ' +
+      'background.',
     lesson:
       'A discovery often appears as a small excess above a smooth background. ' +
       'Isolation rejects jets faking photons; the rest is patience and statistics.',
+    targetNote:
+      '5σ is the discovery convention — the same bar the real H → γγ search ' +
+      'cleared in July 2012.',
     observable: { name: 'Diphoton invariant mass', feature: 'diphotonMass', unit: 'GeV', xmin: 80, xmax: 180, bins: 40, target: 125 },
     explore: [
       { name: 'H_gg', label: 'signal: H → γγ (two isolated photons)' },
@@ -164,6 +176,9 @@ export const MISSIONS = [
     lesson:
       'Not every search is a bump hunt. Some are counting experiments: demand ' +
       'the right number of jets, b-tags and missing energy, then count the excess.',
+    targetNote:
+      'Top pairs are produced constantly at the LHC — a counting rediscovery ' +
+      'should be overwhelming, far beyond the 5σ convention.',
     observable: { name: 'HT (scalar sum of jet pT)', feature: 'HT', unit: 'GeV', xmin: 0, xmax: 600, bins: 30, target: null },
     explore: [
       { name: 'ttbar_lj', label: 'signal: tt̄ → ℓ + jets + b-jets' },
@@ -176,11 +191,11 @@ export const MISSIONS = [
       { name: 'QCD_fake', kind: 'bkg', expected: 5000 },
     ],
     cuts: [
-      toggle('oneLep', '≥ 1 isolated lepton', 'Require a lepton from the W decay.', (f) => f.nLeptons >= 1 && f.muonIso < 0.3),
+      toggle('oneLep', '≥ 1 lepton', 'Require a lepton from the W decay.', (f) => f.nLeptons >= 1),
+      maxCut('lepIso', 'Lepton isolation <', 'Real W leptons are isolated; QCD fakes sit inside jets.', 'muonIso', { min: 0.05, max: 1, step: 0.05, def: 0.5 }),
       minCut('met', 'Missing pT >', 'The neutrino gives real missing energy.', 'met', { min: 0, max: 80, def: 25, unit: 'GeV' }),
       minCut('njets', '≥ N jets', 'Top pair decays give many jets.', 'nJetsTotal', { min: 0, max: 6, def: 4, unit: '' }),
-      toggle('btag', '≥ 1 b-tag', 'Tops decay to b-quarks: require a b-jet.', (f) => f.nBjets >= 1),
-      toggle('btag2', '≥ 2 b-tags', 'Both tops give a b-jet — the cleanest cut.', (f) => f.nBjets >= 2),
+      minCut('btags', '≥ N b-tags', 'Both tops decay to b-quarks — count b-tagged jets.', 'nBjets', { min: 0, max: 3, def: 2, unit: '' }),
     ],
     target: 18,
   },
@@ -200,6 +215,9 @@ export const MISSIONS = [
       'The rarest processes demand near-perfect object identification. Two ' +
       'b-jets AND two taus AND missing energy together beat down enormous ' +
       'backgrounds — but statistics are everything.',
+    targetNote:
+      '3σ is "evidence" — even the real LHC experiments have not yet reached ' +
+      '5σ for Higgs-pair production.',
     observable: { name: 'HT (scalar sum of jet pT)', feature: 'HT', unit: 'GeV', xmin: 0, xmax: 500, bins: 25, target: null },
     explore: [
       { name: 'HH_bbtautau', label: 'signal: HH → bbττ' },

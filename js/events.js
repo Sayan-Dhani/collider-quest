@@ -13,7 +13,7 @@
 import {
   Z_MASS, W_MASS, HIGGS_MASS, MUON_MASS,
   pairMass, fourMomentum, invariantMass,
-  randRange, randInt, pick, gauss, degToRad,
+  rand, randRange, randInt, pick, gauss, degToRad,
 } from './physics.js';
 
 let _uid = 0;
@@ -116,134 +116,203 @@ function ptForMass(m, a1, a2) {
   return m / (2 * Math.max(0.25, s));
 }
 
+// --- transverse balance ------------------------------------------------------
+// Real collisions balance in the transverse plane, and MET is exactly what a
+// detector infers from that: minus the vector sum of everything visible (plus
+// a soft unclustered-energy smear). Generators therefore arrange their visible
+// objects so that any residual imbalance IS the invisible system (neutrinos),
+// and MET follows by construction — the event display and the features can no
+// longer contradict the "missing momentum = imbalance" lesson.
+
+function visibleSum(objs) {
+  let px = 0, py = 0;
+  for (const o of objs) {
+    if (!o.fromHardProcess) continue;
+    const a = degToRad(o.angle);
+    px += o.pt * Math.cos(a);
+    py += o.pt * Math.sin(a);
+  }
+  return { px, py };
+}
+
+function toPolar(px, py) {
+  let angle = (Math.atan2(py, px) * 180) / Math.PI;
+  if (angle < 0) angle += 360;
+  return { magnitude: Math.hypot(px, py), angle };
+}
+
+// MET = -(vector sum of visible hard-process pT) + soft resolution smear.
+function metFromBalance(objs, softSigma = 6) {
+  const { px, py } = visibleSum(objs);
+  return toPolar(-px + gauss(0, softSigma), -py + gauss(0, softSigma));
+}
+
+// A pair produced off-back-to-back has net pT: physically it recoiled against
+// a jet. Add that balancing jet so the event genuinely balances (small
+// residuals are left to the soft term in metFromBalance).
+function addRecoilJet(objs) {
+  const { px, py } = visibleSum(objs);
+  const r = toPolar(-px, -py);
+  if (r.magnitude < 12) return;
+  objs.push(mkJet(r.angle, r.magnitude));
+}
+
+// Extra hadronic activity that does not fake MET: jets in back-to-back pairs.
+function addBalancedJetPairs(objs, nPairs, lo = 25, hi = 60) {
+  for (let i = 0; i < nPairs; i++) {
+    const a = randRange(0, 360);
+    const p = randRange(lo, hi);
+    objs.push(mkJet(a, p));
+    objs.push(mkJet((a + 180 + randRange(-6, 6) + 360) % 360, p * randRange(0.9, 1.1)));
+  }
+}
+
+// W -> mu nu transverse decay: the muon and neutrino share the W mass
+// back-to-back, each with pT = (m/2)·sin(theta*). Uniform cos(theta*) piles
+// the pT up just below m/2 — the Jacobian peak — so mT ~= 2·pT ends in a sharp
+// edge at the W mass. The neutrino is implicit: MET = -(sum of visibles).
+function wDecayMuon() {
+  const m = gauss(W_MASS, 2.1);
+  const cosT = randRange(-1, 1);
+  const p = (m / 2) * Math.sqrt(1 - cosT * cosT);
+  return mkMuon(pick(['+', '-']), randRange(0, 360), Math.max(3, p * (1 + gauss(0, 0.04))));
+}
+
 const PROCESSES = {
-  // Z -> mu mu : two isolated opposite-charge muons, dimuon mass ~ Z, low MET.
+  // Z -> mu mu : two isolated opposite-charge muons, dimuon mass ~ Z. No
+  // invisibles, so after the recoil jet the event balances and MET is small.
   Z_mumu() {
     const [a1, a2] = twoBackToBack(25);
     const c = pick(['+', '-']);
     const p = ptForMass(gauss(Z_MASS, 3), a1, a2);
     const objs = [mkMuon(c, a1, p), mkMuon(opp(c), a2, p)];
-    maybeAddJets(objs, randInt(0, 1));
-    return { objects: objs, met: softMet() };
+    addRecoilJet(objs);
+    return { objects: objs, met: metFromBalance(objs, 5) };
   },
 
-  // Drell-Yan continuum: two opposite muons but NON-resonant mass (fills under
-  // and around the Z peak). Same signature, separated only by the mass window.
+  // Non-resonant Drell-Yan (gamma* -> mumu): the same signature as the Z, on a
+  // smooth ~1/m^2 spectrum from 25 to 200 GeV with NO hole — part of it sits
+  // right under the Z peak, so the mass window can never remove all of it.
   DY_continuum() {
     const [a1, a2] = twoBackToBack(60);
     const c = pick(['+', '-']);
-    const m = pick([randRange(25, 78), randRange(104, 200)]);
+    const m = 25 / (1 - rand() * (1 - 25 / 200)); // 1/m^2 fall, 25..200
     const p = ptForMass(m, a1, a2);
     const objs = [mkMuon(c, a1, p), mkMuon(opp(c), a2, p)];
-    maybeAddJets(objs, randInt(0, 2));
-    return { objects: objs, met: softMet() };
+    addRecoilJet(objs);
+    return { objects: objs, met: metFromBalance(objs, 5) };
   },
 
-  // ttbar -> 2 leptons + 2 b-jets + MET (neutrinos). Two muons but with b-jets
-  // and real MET, broad mass. Removed by b-veto / MET cut.
+  // ttbar -> 2 leptons + 2 b-jets. The two neutrinos are the residual
+  // imbalance of the visible system -> genuine, correlated MET.
   ttbar_2mu() {
     const [a1, a2] = twoBackToBack(70);
+    const [b1, b2] = twoBackToBack(60);
     const c = pick(['+', '-']);
     const objs = [
       mkMuon(c, a1, gauss(40, 12)),
       mkMuon(opp(c), a2, gauss(40, 12)),
-      mkBjet(randRange(0, 360), gauss(70, 20)),
-      mkBjet(randRange(0, 360), gauss(60, 18)),
+      mkBjet(b1, gauss(70, 20)),
+      mkBjet(b2, gauss(60, 18)),
     ];
-    return { objects: objs, met: { magnitude: gauss(60, 18), angle: randRange(0, 360) } };
+    return { objects: objs, met: metFromBalance(objs, 8) };
   },
 
-  // QCD multijet with a fake muon inside the jets (non-isolated).
+  // QCD multijet: jets balance each other (the last one closes the event), a
+  // fake muon sits inside a jet. MET is small — except for an occasional
+  // mismeasured-jet tail, so a MET cut is a trade-off, not a switch.
   QCD_fake() {
     const objs = [];
     const nj = randInt(3, 5);
-    for (let i = 0; i < nj; i++) objs.push(mkJet(randRange(0, 360), randRange(30, 90)));
+    for (let i = 0; i < nj - 1; i++) objs.push(mkJet(randRange(0, 360), randRange(30, 90)));
+    const { px, py } = visibleSum(objs);
+    const close = toPolar(-px, -py);
+    objs.push(mkJet(close.angle, Math.max(25, close.magnitude)));
     objs.push(mkFakeMuon((objs[0].angle + randRange(-12, 12) + 360) % 360, randRange(10, 30)));
-    return { objects: objs, met: { magnitude: randRange(5, 25), angle: randRange(0, 360) } };
+    const soft = rand() < 0.2 ? 18 : 6; // 20%: badly mismeasured jet
+    return { objects: objs, met: metFromBalance(objs, soft) };
   },
 
-  // W -> mu nu : one isolated muon + large MET (escaping neutrino).
+  // W -> mu nu : Jacobian-peak muon; the neutrino is exactly what is missing,
+  // so MET points opposite the muon and mT edges sharply at the W mass.
   W_munu() {
-    const a = randRange(0, 360);
-    const objs = [mkMuon(pick(['+', '-']), a, gauss(42, 10))];
-    maybeAddJets(objs, randInt(0, 2));
-    return { objects: objs, met: { magnitude: gauss(45, 12), angle: (a + 180 + randRange(-30, 30) + 360) % 360 } };
+    const objs = [wDecayMuon()];
+    if (rand() < 0.35) addBalancedJetPairs(objs, 1);
+    return { objects: objs, met: metFromBalance(objs) };
   },
 
   // H -> gamma gamma : two isolated photons, diphoton mass ~ 125 (narrow).
+  // (ptForMass always yields pT >= m/2 >= 40 GeV here — no clamp needed.)
   H_gg() {
     const [a1, a2] = twoBackToBack(35);
     const p = ptForMass(gauss(HIGGS_MASS, 1.6), a1, a2);
-    const objs = [mkPhoton(a1, Math.max(30, p)), mkPhoton(a2, Math.max(30, p))];
-    maybeAddJets(objs, randInt(0, 2));
-    return { objects: objs, met: softMet() };
+    const objs = [mkPhoton(a1, p), mkPhoton(a2, p)];
+    addRecoilJet(objs);
+    return { objects: objs, met: metFromBalance(objs, 5) };
   },
 
   // Continuum diphoton background: two real photons, smoothly falling mass.
   gg_continuum() {
     const [a1, a2] = twoBackToBack(70);
-    const m = 80 + Math.pow(Math.random(), 2.2) * 100; // smoothly falling 80..180
+    const m = 80 + Math.pow(rand(), 2.2) * 100; // smoothly falling 80..180
     const p = ptForMass(m, a1, a2);
-    const objs = [mkPhoton(a1, Math.max(25, p)), mkPhoton(a2, Math.max(25, p))];
-    maybeAddJets(objs, randInt(0, 2));
-    return { objects: objs, met: softMet() };
+    const objs = [mkPhoton(a1, p), mkPhoton(a2, p)];
+    addRecoilJet(objs);
+    return { objects: objs, met: metFromBalance(objs, 5) };
   },
 
   // gamma + jet: one real photon + a jet whose leading pi0 fakes a photon
   // (high isolation). Removed by the isolation cut.
   gamma_jet() {
     const [a1, a2] = twoBackToBack(70);
-    const m = 80 + Math.pow(Math.random(), 1.8) * 100;
+    const m = 80 + Math.pow(rand(), 1.8) * 100;
     const p = ptForMass(m, a1, a2);
-    const real = mkPhoton(a1, Math.max(25, p));
-    const fake = mkPhoton(a2, Math.max(25, p), randRange(0.25, 0.7)); // non-isolated fake
+    const real = mkPhoton(a1, p);
+    const fake = mkPhoton(a2, p, randRange(0.25, 0.7)); // non-isolated fake
     fake.hcal = fake.pt * randRange(0.4, 0.8);
     const objs = [real, fake];
-    maybeAddJets(objs, randInt(1, 3));
-    return { objects: objs, met: softMet() };
+    addRecoilJet(objs);
+    addBalancedJetPairs(objs, randInt(0, 1));
+    return { objects: objs, met: metFromBalance(objs, 5) };
   },
 
-  // ttbar -> lepton + jets : 1 isolated lepton + MET + >=4 jets, >=1 b-jet.
+  // ttbar -> lepton + jets : Jacobian W muon + 2 b-jets + 2 light jets. The
+  // single neutrino (plus jet residuals) is the imbalance -> real MET.
   ttbar_lj() {
-    const a = randRange(0, 360);
-    const objs = [mkMuon(pick(['+', '-']), a, gauss(40, 12))];
-    objs.push(mkBjet(randRange(0, 360), gauss(75, 20)));
-    objs.push(mkBjet(randRange(0, 360), gauss(65, 18)));
-    for (let i = 0; i < randInt(2, 3); i++) objs.push(mkJet(randRange(0, 360), gauss(55, 18)));
-    return { objects: objs, met: { magnitude: gauss(45, 15), angle: randRange(0, 360) } };
+    const objs = [wDecayMuon()];
+    const [b1, b2] = twoBackToBack(60);
+    objs.push(mkBjet(b1, gauss(75, 20)));
+    objs.push(mkBjet(b2, gauss(65, 18)));
+    addBalancedJetPairs(objs, 1, 35, 70);
+    return { objects: objs, met: metFromBalance(objs, 7) };
   },
 
-  // W + jets : lepton + MET + jets but (usually) no b-jets. ttbar background.
+  // W + jets : same W decay + balanced jet activity, (usually) no b-jets.
   Wjets() {
-    const a = randRange(0, 360);
-    const objs = [mkMuon(pick(['+', '-']), a, gauss(38, 10))];
-    const nj = randInt(2, 4);
-    for (let i = 0; i < nj; i++) {
-      // occasional real b from gluon splitting
-      if (Math.random() < 0.12) objs.push(mkBjet(randRange(0, 360), gauss(50, 15)));
-      else objs.push(mkJet(randRange(0, 360), gauss(50, 15)));
+    const objs = [wDecayMuon()];
+    addBalancedJetPairs(objs, randInt(1, 2), 30, 65);
+    // occasional real b from gluon splitting
+    for (let i = 0; i < objs.length; i++) {
+      const o = objs[i];
+      if (o.kind === 'jet' && rand() < 0.12) objs[i] = mkBjet(o.angle, o.pt);
     }
-    return { objects: objs, met: { magnitude: gauss(40, 12), angle: (a + 180 + randRange(-40, 40) + 360) % 360 } };
+    return { objects: objs, met: metFromBalance(objs, 6) };
   },
 
-  // HH -> bb tautau : 2 b-jets + 2 taus + MET. Very rare.
+  // HH -> bb tautau : 2 b-jets + 2 taus. Tau decays lose neutrinos, so the
+  // residual imbalance of the visible system is genuine MET.
   HH_bbtautau() {
+    const [b1, b2] = twoBackToBack(70);
+    const [t1, t2] = twoBackToBack(50);
     const objs = [
-      mkBjet(randRange(0, 360), gauss(70, 18)),
-      mkBjet(randRange(0, 360), gauss(60, 16)),
-      mkTau(pick(['+', '-']), randRange(0, 360), gauss(45, 12)),
-      mkTau(pick(['+', '-']), randRange(0, 360), gauss(40, 12)),
+      mkBjet(b1, gauss(70, 18)),
+      mkBjet(b2, gauss(60, 16)),
+      mkTau(pick(['+', '-']), t1, gauss(45, 12)),
+      mkTau(pick(['+', '-']), t2, gauss(40, 12)),
     ];
-    return { objects: objs, met: { magnitude: gauss(50, 15), angle: randRange(0, 360) } };
+    return { objects: objs, met: metFromBalance(objs, 8) };
   },
 };
-
-function maybeAddJets(objs, n) {
-  for (let i = 0; i < n; i++) objs.push(mkJet(randRange(0, 360), randRange(25, 60)));
-}
-function softMet() {
-  return { magnitude: randRange(1, 12), angle: randRange(0, 360) };
-}
 
 // --- pileup ------------------------------------------------------------------
 // Overlay soft tracks and a couple of soft jets to make the display realistic.
